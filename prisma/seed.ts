@@ -415,7 +415,23 @@ async function main() {
             esUsuarioFaena: created.esUsuarioFaena,
           })
         } catch (err) {
-          console.warn(`  ⚠️  No se pudo crear cliente: ${c.nombre} (${c.cuit}) — ${(err as Error).message}`)
+          const errMsg = err instanceof Error ? err.message : String(err)
+          const errCode = (err as any)?.code || ''
+          console.warn(`  ⚠️  No se pudo crear cliente: ${c.nombre} (${c.cuit}) — [${errCode}] ${errMsg}`)
+          if (errMsg.includes('Unique constraint')) {
+            console.warn(`     → Intentando buscar cliente existente con CUIT ${c.cuit}...`)
+            const existente = await prisma.cliente.findFirst({ where: { cuit: c.cuit ?? undefined } })
+            if (existente) {
+              console.warn(`     → Encontrado: ${existente.id} — se usará este ID`)
+              clientes.push({
+                id: existente.id,
+                nombre: existente.nombre,
+                cuit: existente.cuit,
+                esProductor: existente.esProductor,
+                esUsuarioFaena: existente.esUsuarioFaena,
+              })
+            }
+          }
         }
       }
       logOk('Clientes creados', clientes.length)
@@ -437,7 +453,12 @@ async function main() {
       })
       defaultClienteId = defCliente.id
     } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e)
+      console.warn(`  ⚠️  No se pudo crear cliente por defecto: ${errMsg}`)
       defaultClienteId = clientes[0]?.id || ''
+    }
+    if (!defaultClienteId) {
+      console.error('  ❌ ERROR CRÍTICO: No hay ningún cliente disponible. Las tropas y facturas no se podrán crear.')
     }
 
     // ═══ PASO 7: Tropas (desde JSON) ═══
@@ -649,6 +670,12 @@ async function main() {
           facturasVistas.add(f.noFactura)
 
           const cliente = findCliente(clientes, null, f.usuario) || { id: defaultClienteId } as { id: string }
+
+          // Si no hay cliente válido, saltar esta factura
+          if (!cliente.id) {
+            console.warn(`  ⚠️  Factura ${f.noFactura} saltada: no hay cliente disponible para "${f.usuario}"`)
+            continue
+          }
 
           const estado = f.estadoPago === 'PAGADO' ? EstadoFactura.PAGADA
             : f.estadoPago === 'EMITIDA' ? EstadoFactura.EMITIDA

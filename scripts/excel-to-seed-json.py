@@ -313,15 +313,41 @@ def main():
         tropa_fecha_faena[numero] = fecha_faena
         tropa_fecha_ingreso[numero] = fecha_ingreso
 
+        # Resolve usuario de faena: prioridad Matarife > CUIT Titular > CUIT Matarife
+        uf_nombre = clean_str(d.get("Matarife / Usuario Faena"))
+        uf_cuit = clean_str(d.get("CUIT Matarife"))
+        titular_cuit = clean_str(d.get("CUIT Titular"))
+        titular_contacto = clean_str(d.get("Contacto"))
+
+        # Si no tiene matarife, buscar por CUIT del titular
+        if not uf_nombre and titular_cuit:
+            # Buscar en la lista de titulares por CUIT
+            for cl in clientes:
+                if cl.get("cuit") and cl["cuit"].upper() == titular_cuit.upper():
+                    uf_nombre = cl["nombre"]
+                    break
+
+        # Si no tiene CUIT Productor, buscar por CUIT Titular (a veces coincide)
+        prod_nombre = clean_str(d.get("Productor"))
+        prod_cuit = clean_str(d.get("CUIT Productor"))
+
         tropas.append({
             "numero": numero,
             "codigo": tropa_codigo,
             "especie": clean_str(d.get("Especie")),
             "cantidadCabezas": fmt_num(d.get("Cant. Cabezas")),
-            "productorNombre": clean_str(d.get("Productor")),
-            "productorCuit": clean_str(d.get("CUIT Productor")),
-            "usuarioFaenaNombre": clean_str(d.get("Matarife / Usuario Faena")),
+            "productorNombre": prod_nombre,
+            "productorCuit": prod_cuit,
+            "usuarioFaenaNombre": uf_nombre,
+            "usuarioFaenaCuit": uf_cuit,
+            "dte": clean_str(d.get("DTE")),
+            "guia": clean_str(d.get("Guia")),
+            "corral": clean_str(d.get("Corral")),
+            "matriculaMatarife": clean_str(d.get("Matricula Matarife")),
+            "cuitTitular": titular_cuit,
+            "contactoTitular": titular_contacto,
             "fechaFaena": fecha_faena,
+            "fechaIngreso": fecha_ingreso,
             "estado": estado,
             "pesoVivo": fmt_num(d.get("Kg Vivo")),
             "kgGancho": fmt_num(d.get("Kg 1/2 Res")),

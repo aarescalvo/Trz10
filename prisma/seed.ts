@@ -557,7 +557,9 @@ async function main() {
         numero: number; codigo: string; especie: string; cantidadCabezas: number;
         productorNombre: string | null; productorCuit: string | null;
         usuarioFaenaNombre: string | null; usuarioFaenaCuit?: string | null;
-        fechaFaena: string | null; estado: string;
+        dte: string | null; guia: string | null; corral: string | null;
+        matriculaMatarife: string | null; cuitTitular: string | null;
+        fechaFaena: string | null; fechaIngreso: string | null; estado: string;
         pesoVivo: number | null; kgGancho: number | null; rindePct: number | null;
         observaciones: string | null
       }>('tropas.json')
@@ -601,8 +603,8 @@ async function main() {
               productorId: productor?.id ?? null,
               usuarioFaenaId: usuarioFaena?.id ?? defaultClienteId,
               especie,
-              dte: `DTE-2026-${String(t.numero).padStart(4, '0')}`,
-              guia: `GUIA-2026-${String(t.numero).padStart(4, '0')}`,
+              dte: t.dte || `DTE-2026-${String(t.numero).padStart(4, '0')}`,
+              guia: t.guia ? String(t.guia) : `GUIA-2026-${String(t.numero).padStart(4, '0')}`,
               cantidadCabezas: t.cantidadCabezas,
               estado: estadoTropa,
               pesoBruto: t.pesoVivo ? t.pesoVivo * 1.15 : null,

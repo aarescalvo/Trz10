@@ -1,0 +1,100 @@
+[
+  {
+    "id": "camara-01",
+    "nombre": "CAMARA 1",
+    "tipo": "FAENA",
+    "capacidad": 200,
+    "observaciones": null
+  },
+  {
+    "id": "camara-02",
+    "nombre": "CAMARA 2",
+    "tipo": "FAENA",
+    "capacidad": 200,
+    "observaciones": null
+  },
+  {
+    "id": "camara-03",
+    "nombre": "CAMARA 3",
+    "tipo": "FAENA",
+    "capacidad": 100,
+    "observaciones": null
+  },
+  {
+    "id": "camara-04",
+    "nombre": "CAMARA 4",
+    "tipo": "DEPOSITO",
+    "capacidad": 10000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-05",
+    "nombre": "CAMARA 5",
+    "tipo": "DEPOSITO",
+    "capacidad": 10000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-06",
+    "nombre": "CAMARA 7",
+    "tipo": "DEPOSITO",
+    "capacidad": 60000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-07",
+    "nombre": "DEPOSITO DE ENFRIADO",
+    "tipo": "DEPOSITO",
+    "capacidad": 60000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-08",
+    "nombre": "DEPOSITO DE CONGELADO",
+    "tipo": "DEPOSITO",
+    "capacidad": 60000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-09",
+    "nombre": "TUNEL DE CONGELADO N°1",
+    "tipo": "DEPOSITO",
+    "capacidad": 60000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-10",
+    "nombre": "TUNEL DE CONGELADO N°2",
+    "tipo": "DEPOSITO",
+    "capacidad": 60000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-11",
+    "nombre": "CONTENEDOR N°1",
+    "tipo": "DEPOSITO",
+    "capacidad": 60000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-12",
+    "nombre": "CONTENEDOR N°2",
+    "tipo": "DEPOSITO",
+    "capacidad": 60000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-13",
+    "nombre": "CONTENEDOR N°3",
+    "tipo": "DEPOSITO",
+    "capacidad": 60000,
+    "observaciones": null
+  },
+  {
+    "id": "camara-14",
+    "nombre": "CONTENEDOR N°4",
+    "tipo": "DEPOSITO",
+    "capacidad": 60000,
+    "observaciones": null
+  }
+]

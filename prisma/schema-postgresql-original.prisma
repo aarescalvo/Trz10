@@ -1,0 +1,5572 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// SECCIÓN 1: CONFIGURACIÓN DEL SISTEMA Y PLANTA
+// ============================================================
+
+/// Datos generales del establecimiento frigorífico (nombre, CUIT, matrícula, configuración de email).
+model ConfiguracionFrigorifico {
+  id                    String  @id @default(cuid())
+  nombre                String  @default("Solemar Alimentaria")
+  direccion             String?
+  numeroEstablecimiento String? // N° Establecimiento Oficial
+  cuit                  String?
+  numeroMatricula       String? // N° Matrícula
+  logo                  String? // URL del logo (logo.png)
+
+  // Configuración de emails
+  emailHost       String? // smtp.office365.com
+  emailPuerto     Int?    @default(587)
+  emailUsuario    String? // usuario@solemar.com.ar
+  emailPassword   String? // Encriptado
+  emailHabilitado Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Contadores secuenciales para generación de números (tropas, tickets, etc.).
+model Numerador {
+  id           String @id @default(cuid())
+  nombre       String @unique // "TROPA_BOVINO", "TROPA_EQUINO", "TICKET", etc.
+  ultimoNumero Int    @default(0)
+  anio         Int?
+
+  updatedAt DateTime @updatedAt
+}
+
+/// Layout WYSIWYG global para cada módulo (posiciones, botones, tema).
+model LayoutGlobalModulo {
+  id     String @id @default(cuid())
+  modulo String @unique // "ingresoCajon", "romaneo", "pesajeIndividual", etc.
+
+  // Layout WYSIWYG con posiciones exactas
+  layout String? // JSON con posiciones X, Y, width, height:
+  // { "items": [{ "id": "header", "x": 20, "y": 20, "width": 900, "height": 70, "texto": "Título" }] }
+
+  // Configuración de bloques (formato antiguo, compatibilidad)
+  bloques String? // JSON con configuración de cada bloque
+
+  // Configuración de botones
+  botones String? // JSON con textos y visibilidad de botones:
+  // { "items": [{ "id": "asignar", "texto": "ASIGNAR GARRÓN", "visible": true }] }
+
+  // Configuración visual
+  tema           String? // "default", "compacto", "amplio"
+  colorPrincipal String? // Color principal del módulo
+
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([modulo])
+}
+
+/// Configuración de balanzas conectadas al sistema (serial/TCP, protocolo, calibración).
+model Balanza {
+  id     String  @id @default(cuid())
+  nombre String // Nombre identificatorio
+  codigo String? @unique // Código interno
+
+  // Configuración de conexión
+  tipoConexion TipoConexionBalanza @default(SERIAL) // SERIAL, TCP, SIMULADA
+  puerto       String? // COM1, COM2, etc. para serial
+  baudRate     Int                 @default(9600)
+  dataBits     Int                 @default(8)
+  parity       String?             @default("none") // none, odd, even
+  stopBits     Int?                @default(1)
+
+  // Para conexión TCP/IP
+  ip        String? // Dirección IP si es TCP
+  puertoTcp Int? // Puerto TCP
+
+  // Configuración de protocolo
+  protocolo        ProtocoloBalanza @default(GENERICO) // Protocolo de comunicación
+  comandoPeso      String? // Comando para solicitar peso
+  formatoRespuesta String? // Formato de la respuesta (regex)
+
+  // Configuración de peso
+  capacidadMax Float? // Capacidad máxima en kg
+  division     Float? @default(0.1) // División mínima
+  unidad       String @default("kg") // kg, lb, g
+
+  // Calibración
+  fechaCalibracion   DateTime?
+  proximaCalibracion DateTime?
+
+  // Estado
+  activa      Boolean       @default(true)
+  estado      EstadoBalanza @default(DESCONECTADA)
+  ultimoError String?
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  puestos   PuestoTrabajo[]
+  terminals Terminal[]
+
+  @@index([activa])
+  @@index([estado])
+}
+
+/// Estaciones de trabajo físicas con balanza, impresora y scanner asignados.
+model PuestoTrabajo {
+  id     String  @id @default(cuid())
+  nombre String // "Romaneo 1", "Pesaje Camiones", etc.
+  codigo String? @unique // Código interno
+
+  // Ubicación física
+  sector    String? // FAENA, ROMANEO, DESPACHO, etc.
+  ubicacion String? // Descripción de ubicación
+
+  // Configuración de hardware
+  balanzaId String? // Balanza asignada
+  balanza   Balanza? @relation(fields: [balanzaId], references: [id])
+
+  // Impresora de rótulos
+  impresoraIp     String? // IP de la impresora de rótulos
+  impresoraPuerto Int?    @default(9100)
+  impresoraModelo String? // Modelo de impresora (Zebra ZT410, etc.)
+  rotuloDefaultId String? // Rótulo por defecto para este puesto
+
+  // Impresora de tickets (para pesaje camiones)
+  impresoraTicketsIp     String?
+  impresoraTicketsPuerto Int?
+
+  // Scanner/Lector de código de barras
+  scannerHabilitado Boolean @default(false)
+  scannerPuerto     String?
+
+  // Configuración de pantalla
+  modoPantalla String? @default("normal") // normal, touchscreen, kiosk
+
+  // Estado
+  activo    Boolean @default(true)
+  operativo Boolean @default(true)
+
+  // Turno actual
+  operadorActualId String? // Operador logueado actualmente
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([activo])
+  @@index([sector])
+}
+
+/// Configuración de formatos de código de barras (prefijos, patrones, variables).
+model CodigoBarrasConfig {
+  id          String  @id @default(cuid())
+  tipo        String  @unique // Media Res, Cuarto, Producto, Caja, Subproducto, Menudencia
+  prefijo     String // MR, CD, PR, CJ, SB, MN
+  formato     String // MR-TROPA-GARRON-LADO-FECHA
+  descripcion String?
+
+  // Variables disponibles para el formato
+  variables String? // JSON con lista de variables: ["TROPA", "GARRON", "LADO", "FECHA"]
+
+  // Estado
+  activo    Boolean @default(true)
+  esDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([activo])
+}
+
+/// Lugares físicos de almacenamiento para insumos (no frigoríficos).
+model Deposito {
+  id          String   @id @default(cuid())
+  nombre      String
+  descripcion String?
+  ubicacion   String?
+  responsable String?
+  capacidadM2 Float?
+  capacidadM3 Float?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stockInsumos             StockInsumo[]
+  inventarios              Inventario[]
+  movimientosOrigenInsumo  MovimientoInsumo[] @relation("DepositoOrigenInsumo")
+  movimientosDestinoInsumo MovimientoInsumo[] @relation("DepositoDestinoInsumo")
+}
+
+/// Impresoras registradas (rótulos Zebra, tickets, etc.) con IP y configuración.
+model Impresora {
+  id             String   @id @default(cuid())
+  nombre         String
+  tipo           String
+  marca          String?
+  modelo         String?
+  puerto         String   @default("USB")
+  direccionIP    String?
+  anchoEtiqueta  Int      @default(80)
+  altoEtiqueta   Int      @default(50)
+  dpi            Int      @default(203)
+  activa         Boolean  @default(true)
+  predeterminada Boolean  @default(false)
+  observaciones  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  terminales Terminal[]
+}
+
+/// Terminales/puntos de operación con balanza e impresora asignadas.
+model Terminal {
+  id            String     @id @default(cuid())
+  nombre        String
+  ubicacion     String?
+  balanzaId     String?
+  balanza       Balanza?   @relation(fields: [balanzaId], references: [id])
+  impresoraId   String?
+  impresora     Impresora? @relation(fields: [impresoraId], references: [id])
+  activa        Boolean    @default(true)
+  observaciones String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+/// Configuración alternativa de balanzas con parámetros de comunicación detallados.
+model ConfigBalanza {
+  id               String   @id @default(cuid())
+  nombre           String
+  modelo           String?
+  marca            String?
+  tipoConexion     String   @default("SERIAL")
+  puertoSerial     String?
+  baudRate         Int      @default(9600)
+  dataBits         Int      @default(8)
+  stopBits         Int      @default(1)
+  paridad          String   @default("NONE")
+  direccionIP      String?
+  puertoTCP        Int?
+  protocolo        String   @default("CONTINUO")
+  timeout          Int      @default(5000)
+  intervaloLectura Int      @default(500)
+  comandoPesar     String?
+  comandoTara      String?
+  comandoCero      String?
+  formatoTrama     String?
+  posicionPeso     Int?
+  decimales        Int      @default(2)
+  unidad           String   @default("KG")
+  activa           Boolean  @default(true)
+  esPrincipal      Boolean  @default(false)
+  ubicacion        String?
+  terminalId       String?
+  observaciones    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+/// Configuración del sistema de backups automáticos (diario, nube, retención).
+model ConfiguracionBackup {
+  id             String    @id @default(cuid())
+  backupDiario   Boolean   @default(true)
+  horaBackup     String    @default("02:00")
+  retenerDias    Int       @default(30)
+  nubeHabilitado Boolean   @default(false)
+  proveedorNube  String?
+  credenciales   Json?
+  pointInTime    Boolean   @default(false)
+  intervaloPIT   String?
+  activo         Boolean   @default(true)
+  ultimoBackup   DateTime?
+  ultimoExitoso  Boolean   @default(false)
+  tamanoUltimo   Float?
+  espacioUsado   Float?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+/// Registro histórico de backups ejecutados (éxito, error, tamaño, duración).
+model HistorialBackup {
+  id              String   @id @default(cuid())
+  tipo            String?
+  fecha           DateTime @default(now())
+  rutaArchivo     String
+  nombreArchivo   String?
+  tamanio         Float?
+  tablasIncluidas String?
+  estado          String?
+  descripcion     String?
+  mensajeError    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// Plantillas de configuración para rótulos/etiquetas por tipo de producto.
+model ConfiguracionRotulo {
+  id                   String   @id @default(cuid())
+  tipo                 String
+  nombre               String
+  ancho                Int      @default(100)
+  alto                 Int      @default(50)
+  campos               String?
+  incluyeCodigoBarras  Boolean  @default(true)
+  codigoBarrasTipo     String   @default("CODE128")
+  codigoBarrasPosicion String?
+  orientacion          String   @default("HORIZONTAL")
+  margenes             String?
+  plantilla            String?
+  activo               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+/// Políticas de seguridad: complejidad de contraseña, sesiones, bloqueos, horas restringidas.
+model ConfiguracionSeguridad {
+  id                          String   @id @default(cuid())
+  passwordMinLength           Int      @default(8)
+  passwordRequireUppercase    Boolean  @default(true)
+  passwordRequireLowercase    Boolean  @default(true)
+  passwordRequireNumbers      Boolean  @default(true)
+  passwordRequireSpecialChars Boolean  @default(false)
+  passwordMaxAge              Int      @default(90)
+  sessionTimeout              Int      @default(480)
+  maxConcurrentSessions       Int      @default(1)
+  maxLoginAttempts            Int      @default(5)
+  lockoutDuration             Int      @default(30)
+  notifyNewIp                 Boolean  @default(true)
+  notifyFailedAttempts        Boolean  @default(true)
+  notifyPasswordChange        Boolean  @default(true)
+  notifyOutOfHoursAccess      Boolean  @default(false)
+  restrictedHoursEnabled      Boolean  @default(false)
+  allowedHourStart            Int?
+  allowedHourEnd              Int?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}
+
+/// Modelo Corral.
+model Corral {
+  id            String  @id @default(cuid())
+  nombre        String  @unique
+  capacidad     Int     @default(0)
+  observaciones String?
+  activo        Boolean @default(true)
+
+  // Stock actual
+  stockBovinos Int @default(0)
+  stockEquinos Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  animales           Animal[]
+  movimientosOrigen  MovimientoCorral[] @relation("CorralOrigen")
+  movimientosDestino MovimientoCorral[] @relation("CorralDestino")
+  tropas             Tropa[]
+  listaFaenaTropas   ListaFaenaTropa[]
+}
+
+/// Modelo Camara.
+model Camara {
+  id            String     @id @default(cuid())
+  nombre        String     @unique
+  tipo          TipoCamara @default(FAENA)
+  capacidad     Int        @default(0) // Ganchos o KG según tipo
+  observaciones String?
+  activo        Boolean    @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movimientosOrigen      MovimientoCamara[]  @relation("CamaraOrigen")
+  movimientosDestino     MovimientoCamara[]  @relation("CamaraDestino")
+  stockMedias            StockMediaRes[]
+  mediasRes              MediaRes[]
+  registrosCuarteo       RegistroCuarteo[]
+  registrosEmpaque       RegistroEmpaque[]
+  ingresosOrigen         IngresoDespostada[] @relation("IngresoOrigen")
+  ingresosDestino        IngresoDespostada[] @relation("IngresoDestino")
+  cuartos                Cuarto[]
+  pallets                Pallet[]
+  stockProductos         StockProducto[]
+  sesionesRomaneo        SesionRomaneo[]
+  stockCamara            StockCamara[]
+  stockCamaraSIGICA      StockCamaraSIGICA?
+  ingresosTerceroDestino IngresoTercero[]
+  alertas                AlertaStock[]
+}
+
+/// Modelo Tipificador.
+model Tipificador {
+  id        String  @id @default(cuid())
+  nombre    String
+  apellido  String
+  numero    String? // Número interno
+  matricula String  @unique // Número de matrícula (se usa en rótulos)
+  activo    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  romaneos        Romaneo[]
+  sesionesRomaneo SesionRomaneo[]
+}
+
+/// Tipos de cámara: FAENA (capacidad en ganchos), CUARTEO/DEPOSITO (capacidad en kg).
+enum TipoCamara {
+  FAENA // Capacidad en ganchos
+  CUARTEO // Capacidad en KG
+  DEPOSITO // Capacidad en KG
+}
+
+/// Tipos de conexión a balanza: SERIAL, TCP, SIMULADA.
+enum TipoConexionBalanza {
+  SERIAL // Puerto serie (COM)
+  TCP // Conexión TCP/IP
+  SIMULADA // Modo simulación/demomo
+}
+
+/// Protocolos de comunicación con balanzas: GENERICO, TOLEDO, METTLER, OHAUS, DIGI, ADAM, CUSTOM.
+enum ProtocoloBalanza {
+  GENERICO // Protocolo genérico ASCII
+  TOLEDO // Balanzas Toledo
+  METTLER // Mettler Toledo
+  OHAUS // Ohaus
+  DIGI // Digi
+  ADAM // Adam Equipment
+  CUSTOM // Protocolo personalizado
+}
+
+/// Estados de balanza: DESCONECTADA, CONECTADA, ERROR, CALIBRANDO, LISTA.
+enum EstadoBalanza {
+  DESCONECTADA
+  CONECTADA
+  ERROR
+  CALIBRANDO
+  LISTA
+}
+
+// ============================================================
+// SECCIÓN 2: GESTIÓN DE CLIENTES Y PROVEEDORES
+// ============================================================
+
+/// Clientes del sistema: usuarios de faena (matarifes), compradores, proveedores de terceros.
+model Cliente {
+  id     String      @id @default(cuid())
+  nombre String
+  tipo   TipoCliente @default(USUARIO_FAENA) // Rol del cliente en el sistema
+
+  // Identificación
+  dni       String? // DNI número
+  cuit      String? @unique
+  matricula String? // Número de matrícula (matarifes)
+
+  // Contacto
+  direccion           String?
+  localidad           String? // Ciudad
+  provincia           String? // Provincia
+  telefono            String? // Teléfono principal
+  telefonoAlternativo String? // Otro contacto
+  email               String?
+
+  // Datos de facturación
+  razonSocial  String? // Razón social para facturación
+  condicionIva String? // RI, CF, EX, MT (Monotributo)
+  puntoVenta   String? // Punto de venta preferido
+
+  // Observaciones
+  observaciones String?
+
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  // USUARIO_FAENA: trae hacienda para faena (Tropa.usuarioFaenaId)
+  // COMPRADOR: recibe facturas, despachos, liquidaciones
+  // PROVEEDOR_TERCE: provee carne de terceros (IngresoTercero.clienteId)
+  tropasComoUsuarioFaena Tropa[]                   @relation("UsuarioFaenaTropas")
+  facturas               Factura[]
+  reclamos               ReclamoCliente[]
+  mediasRes              MediaRes[]
+  preciosServicio        PrecioServicio[]
+  cuartos                Cuarto[]                  @relation("CuartoPropietario")
+  cajas                  CajaEmpaque[]             @relation("CajaPropietario")
+  liquidaciones          LiquidacionFaena[]
+  historicoTarifas       HistoricoTarifa[]
+  c2Expediciones         C2ExpedicionOrden[]
+  observacionesUsuario   ObservacionUsuario[]
+  ingresosTercero        IngresoTercero[]          @relation("IngresoTerceroProveedor") // como PROVEEDOR_TERCE
+  preciosCliente         PrecioCliente[]
+  preciosHistorico       HistoricoPrecioProducto[]
+
+  precioRendering     PrecioRendering[]
+  notasCreditoCliente NotaCredito[]
+  notasDebitoCliente  NotaDebito[]
+  despachos           Despacho[]        @relation("DespachoCliente")
+}
+
+/// Empresas de transporte que trasladan hacienda y mercadería.
+model Transportista {
+  id        String  @id @default(cuid())
+  nombre    String
+  cuit      String? @unique
+  direccion String?
+  telefono  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pesajes PesajeCamion[]
+  vehiculos Vehiculo[]
+}
+
+/// Vehículos (camiones/acoplados) con patente, chofer y datos de habilitación.
+model Vehiculo {
+  id              String         @id @default(cuid())
+  patente         String         @unique // "AB123CD" normalizada (sin espacios ni puntos)
+  patenteMostrar  String         // "AB 123 CD" formateada para mostrar
+  choferNombre    String?
+  choferDni       String?
+  choferTelefono  String?
+  habilitacion    String?
+  empresa         String?
+  transportistaId String?
+  transportista   Transportista? @relation(fields: [transportistaId], references: [id])
+  ultimaVisita    DateTime       @default(now())
+  vecesVisita     Int            @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pesajes PesajeCamion[]
+
+  @@index([patente])
+}
+
+/// Notas y seguimientos sobre clientes (observaciones internas).
+model ObservacionUsuario {
+  id               String    @id @default(cuid())
+  clienteId        String
+  cliente          Cliente   @relation(fields: [clienteId], references: [id])
+  tipo             String    @default("NOTA")
+  observacion      String
+  fechaSeguimiento DateTime?
+  resuelto         Boolean   @default(false)
+  resolucion       String?
+  fechaResolucion  DateTime?
+  operadorId       String?
+  operador         Operador? @relation(fields: [operadorId], references: [id])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([clienteId])
+  @@index([resuelto])
+}
+
+/// Productores y consignatarios de hacienda (origen de los animales).
+model ProductorConsignatario {
+  id                    String        @id @default(cuid())
+  nombre                String
+  cuit                  String?
+  direccion             String?
+  telefono              String?
+  email                 String?
+  tipo                  TipoProductor @default(PRODUCTOR)
+  numeroRenspa          String?
+  numeroEstablecimiento String?
+  localidad             String?
+  provincia             String?
+  observaciones         String?
+  activo                Boolean       @default(true)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  // Relaciones operativas
+  tropas               Tropa[]             @relation("ProductorTropas")
+  declaracionesJuradas DeclaracionJurada[]
+}
+
+/// Proveedores de insumos, servicios, equipos, empques, limpieza, veterinaria.
+model Proveedor {
+  id            String        @id @default(cuid())
+  nombre        String
+  cuit          String?
+  direccion     String?
+  telefono      String?
+  email         String?
+  tipo          TipoProveedor @default(OTROS)
+  contacto      String? // Persona de contacto
+  observaciones String?
+  activo        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  ordenesCompra OrdenCompra[]
+}
+
+/// Clasificación del cliente: USUARIO_FAENA (matarife), COMPRADOR, PROVEEDOR_TERCE.
+enum TipoCliente {
+  USUARIO_FAENA // Matarife - trae hacienda para faena
+  COMPRADOR // Comprador de carne/productos
+  PROVEEDOR_TERCE // Proveedor de carne de terceros (ingresos de terceros)
+}
+
+/// Tipo de productor/consignatario: PRODUCTOR, CONSIGNATARIO o AMBOS.
+enum TipoProductor {
+  PRODUCTOR
+  CONSIGNATARIO
+  AMBOS
+}
+
+/// Tipos de proveedor: INSUMOS, SERVICIOS, EQUIPOS, EMPAQUES, LIMPIEZA, VETERINARIOS, OTROS.
+enum TipoProveedor {
+  INSUMOS
+  SERVICIOS
+  EQUIPOS
+  EMPAQUES
+  LIMPIEZA
+  VETERINARIOS
+  OTROS
+}
+
+// ============================================================
+// SECCIÓN 3: CICLO I — RECEPCIÓN DE HACIENDA
+// ============================================================
+
+/// Grupo de animales que llega junto (mismo DTE, guía, productor). Núcleo del Ciclo I.
+model Tropa {
+  id                 String  @id @default(cuid())
+  numero             Int     @unique
+  codigo             String  @unique // Formato: "B 2026 0001" o "E 2026 0001"
+  codigoSimplificado String? // "B0001" para rótulos
+
+  // Origen de los animales
+  productorId    String?
+  productor      ProductorConsignatario? @relation("ProductorTropas", fields: [productorId], references: [id])
+  usuarioFaenaId String
+  usuarioFaena   Cliente                 @relation("UsuarioFaenaTropas", fields: [usuarioFaenaId], references: [id])
+
+  especie Especie @default(BOVINO)
+
+  // Documentos de tránsito (OBLIGATORIOS)
+  dte  String
+  guia String
+
+  // Cantidad total
+  cantidadCabezas Int
+
+  // Tipos de animales (detalle)
+  tiposAnimales TropaAnimalCantidad[]
+
+  // Corral asignado
+  corralId String?
+  corral   Corral? @relation(fields: [corralId], references: [id])
+
+  // Estado
+  estado EstadoTropa @default(RECIBIDO)
+
+  // Pesos (del pesaje de camión)
+  pesoBruto Float?
+  pesoTara  Float?
+  pesoNeto  Float?
+
+  // Pesaje individual (suma de animales pesados)
+  pesoTotalIndividual Float?
+
+  // ==================== DATOS DE FACTURACIÓN SERVICIO FAENA ====================
+  // Fecha de faena real
+  fechaFaena DateTime? // Fecha en que se realizó la faena
+
+  // Kg gancho (peso faena - de romaneo)
+  kgGancho Float? // Total kg gancho de la tropa
+
+  // Rinde (%)
+  rinde Float? // Porcentaje de rendimiento (kgGancho / pesoTotalIndividual * 100)
+
+  // Precio del servicio de faena
+  precioServicioKg            Decimal? @db.Decimal(12, 2) // Precio por kg sin recupero
+  precioServicioKgConRecupero Decimal? @db.Decimal(12, 2) // Precio por kg con recupero (si aplica)
+
+  // Montos del servicio
+  montoServicioFaena Decimal? @db.Decimal(12, 2) // Total servicio + 21% IVA
+  montoFactura       Decimal? @db.Decimal(12, 2) // Total factura con impuestos (tasa + arancel + servicio)
+
+  // Datos de facturación
+  numeroFactura String? // Número de factura emitida
+  fechaFactura  DateTime? // Fecha de emisión de factura
+
+  // Datos de pago
+  fechaPago       DateTime? // Fecha en que se pagó
+  montoDepositado Decimal? @db.Decimal(12, 2) // Monto depositado
+  estadoPago      String? // Estado: PENDIENTE, PAGADO, PARCIAL, etc.
+
+  // Tributos adicionales (de la planilla servicio faena)
+  tasaInspVet  Decimal? @db.Decimal(12, 2) // Tasa inspección veterinaria
+  arancelIpcva Decimal? @db.Decimal(12, 2) // Arancel IPCVA
+
+  observaciones  String?
+  fechaRecepcion DateTime @default(now())
+
+  // Operador que registró
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  // Relación con pesaje de camión
+  pesajeCamionId String?       @unique
+  pesajeCamion   PesajeCamion? @relation(fields: [pesajeCamionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  animales      Animal[]
+  listasFaena   ListaFaenaTropa[]
+  liquidacion   LiquidacionFaena?
+  balancesFaena BalanceFaena[]
+
+  @@unique([dte, guia], name: "tropa_dte_guia_unique")
+  @@index([especie])
+  @@index([estado])
+  @@index([fechaRecepcion])
+  @@index([dte])
+  @@index([guia])
+}
+
+/// Detalle de cantidad de animales por tipo (VA, NO, TO, etc.) dentro de una tropa.
+model TropaAnimalCantidad {
+  id         String     @id @default(cuid())
+  tropaId    String
+  tropa      Tropa      @relation(fields: [tropaId], references: [id], onDelete: Cascade)
+  tipoAnimal TipoAnimal
+  cantidad   Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tropaId, tipoAnimal])
+}
+
+/// Animal individual dentro de una tropa, con peso, caravana, corral y estado de seguimiento.
+model Animal {
+  id      String @id @default(cuid())
+  tropaId String
+  tropa   Tropa  @relation(fields: [tropaId], references: [id])
+
+  numero Int // Número secuencial dentro de la tropa
+  codigo String @unique // Código completo: B20260001-001
+
+  // Identificación
+  caravana   String? // Número de caravana/arete
+  tipoAnimal TipoAnimal
+  raza       String? // Raza del animal (Angus, Hereford, etc.)
+
+  pesoVivo Float? // Peso en pie (del pesaje individual)
+
+  estado   EstadoAnimal @default(RECIBIDO)
+  corralId String? // Corral actual (para movimientos)
+  corral   Corral?      @relation(fields: [corralId], references: [id])
+
+  // Baja/Fallecimiento
+  fechaBaja  DateTime?
+  motivoBaja String?
+  pesoBaja   Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pesajeIndividual PesajeIndividual?
+  asignacionGarron AsignacionGarron?
+
+  @@unique([tropaId, numero])
+  @@index([estado])
+  @@index([corralId])
+}
+
+/// Registro de pesaje de camiones: ingreso de hacienda, pesaje particular, salida de mercadería.
+model PesajeCamion {
+  id           String           @id @default(cuid())
+  tipo         TipoPesajeCamion @default(INGRESO_HACIENDA)
+  numeroTicket Int              @unique
+
+  // Datos del vehículo
+  patenteChasis   String
+  patenteAcoplado String?
+
+  // Chofer
+  choferNombre String?
+  choferDni    String?
+
+  // Transportista
+  transportistaId String?
+  transportista   Transportista? @relation(fields: [transportistaId], references: [id])
+
+  // Vehículo
+  vehiculoId String?
+  vehiculo   Vehiculo? @relation(fields: [vehiculoId], references: [id])
+
+  // Para Ingreso de Hacienda
+  tropa Tropa?
+
+  // Para Salida de Mercadería
+  destino   String?
+  remito    String?
+  factura   String?
+  precintos String? // Números de precinto separados por coma
+
+  // Pesos
+  pesoBruto Float?
+  pesoTara  Float?
+  pesoNeto  Float?
+
+  // Para pesaje particular
+  observaciones String?
+
+  // Estado
+  estado EstadoPesaje @default(ABIERTO)
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  fecha     DateTime  @default(now())
+  fechaTara DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Despachos asociados (salida de mercadería)
+  despachos Despacho[]
+
+  // Despacho por pesaje de camión (relación alternativa)
+  despachoPesaje Despacho? @relation("DespachoPesajeCamion")
+
+  @@index([tipo])
+  @@index([estado])
+  @@index([fecha])
+}
+
+/// Declaración jurada sanitaria del productor (sanidad, procedencia, documentos de tránsito).
+model DeclaracionJurada {
+  id                String   @id @default(cuid())
+  numeroDeclaracion String   @unique // Número único de declaración
+  fecha             DateTime @default(now())
+
+  // Datos del productor
+  productorId        String?
+  productor          ProductorConsignatario? @relation(fields: [productorId], references: [id])
+  nombreProductor    String // Nombre del productor (denormalizado)
+  cuitProductor      String? // CUIT del productor
+  direccionProductor String? // Dirección del productor
+
+  // Datos del origen
+  procedencia String? // Lugar de procedencia de los animales
+
+  // Datos de la especie
+  especie Especie @default(BOVINO)
+
+  // Cantidad
+  cantidadCabezas Int // Cantidad de animales
+
+  // Identificación de tropa/lote
+  numeroTropa String? // Número de tropa
+  numeroLote  String? // Número de lote
+
+  // Documentos de origen
+  numeroDTE  String? // Documento de Tránsito Electrónico
+  numeroGuia String? // Guía de tránsito
+
+  // Declaración de sanidad
+  declaracionSanidad String? // Texto de la declaración
+  procedenciaLibre   Boolean @default(true) // Si proviene de zona libre
+
+  // Observaciones
+  observaciones String?
+
+  // Estado
+  estado EstadoDeclaracionJurada @default(ACTIVA)
+
+  // Operador que generó
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  // Fechas de impresión
+  fechaImpresion DateTime?
+  vecesImpreso   Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fecha])
+  @@index([estado])
+  @@index([especie])
+}
+
+/// Ingreso de carne de terceros (medias reses completas) para proceso de frigorífico.
+model IngresoTercero {
+  id              String    @id @default(cuid())
+  codigo          String    @unique
+  terceroId       String
+  tercero         Cliente   @relation("IngresoTerceroProveedor", fields: [terceroId], references: [id])
+  tipoCuarto      String    @default("ASADO")
+  tipificacion    String?
+  especie         String    @default("EQUINO")
+  cantidad        Int       @default(1)
+  pesoTotal       Float
+  camaraDestinoId String?
+  camaraDestino   Camara?   @relation(fields: [camaraDestinoId], references: [id])
+  dte             String?
+  guia            String?
+  operadorId      String?
+  operador        Operador? @relation(fields: [operadorId], references: [id])
+  observaciones   String?
+  fecha           DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([terceroId])
+  @@index([fecha])
+  @@index([camaraDestinoId])
+}
+
+/// Especies procesadas: BOVINO, EQUINO.
+enum Especie {
+  BOVINO
+  EQUINO
+}
+
+/// Tipos de animales por especie: bovinos (TO, VA, VQ, NO, NT, MEJ) y equinos (PADRILLO, etc.).
+enum TipoAnimal {
+  // Bovinos
+  TO // Toro
+  VA // Vaca
+  VQ // Vaquillona
+  MEJ // Torito/Mej
+  NO // Novillo
+  NT // Novillito
+
+  // Equinos
+  PADRILLO
+  POTRILLO
+  YEGUA
+  CABALLO
+  BURRO
+  MULA
+}
+
+/// Ciclo de vida de una tropa: RECIBIDO → EN_CORRAL → PESADO → LISTO_FAENA → FAENADO → DESPACHADO.
+enum EstadoTropa {
+  RECIBIDO
+  EN_CORRAL
+  EN_PESAJE
+  PESADO
+  LISTO_FAENA
+  EN_FAENA
+  FAENADO
+  DESPACHADO
+}
+
+/// Ciclo de vida de un animal individual: RECIBIDO → PESADO → EN_FAENA → FAENADO → EN_CAMARA → DESPACHADO/FALLECIDO.
+enum EstadoAnimal {
+  RECIBIDO
+  PESADO
+  EN_FAENA
+  FAENADO
+  EN_CAMARA
+  DESPACHADO
+  FALLECIDO
+}
+
+/// Tipos de pesaje de camión: ingreso de hacienda, pesaje particular, salida de mercadería.
+enum TipoPesajeCamion {
+  INGRESO_HACIENDA
+  PESAJE_PARTICULAR
+  SALIDA_MERCADERIA
+}
+
+/// Estados de pesaje: BORRADOR (auto-guardado), ABIERTO, CERRADO, ANULADO.
+enum EstadoPesaje {
+  BORRADOR // Capa 2: Auto-guardado como borrador (no confirmado)
+  ABIERTO
+  CERRADO
+  ANULADO
+}
+
+// ============================================================
+// SECCIÓN 4: CICLO I — PESAJE Y MOVIMIENTO
+// ============================================================
+
+/// Movimientos de animales entre corrales (traslado, reubicación).
+model MovimientoCorral {
+  id       String  @id @default(cuid())
+  tropaId  String?
+  animalId String?
+
+  corralOrigenId  String?
+  corralOrigen    Corral? @relation("CorralOrigen", fields: [corralOrigenId], references: [id])
+  corralDestinoId String
+  corralDestino   Corral  @relation("CorralDestino", fields: [corralDestinoId], references: [id])
+
+  cantidad      Int      @default(1)
+  especie       Especie?
+  observaciones String?
+
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  fecha     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fecha])
+}
+
+/// Pesaje individual de cada animal en pie (balanza corral).
+model PesajeIndividual {
+  id       String @id @default(cuid())
+  animalId String @unique
+  animal   Animal @relation(fields: [animalId], references: [id])
+
+  peso          Float
+  caravana      String? // Si se lee automáticamente
+  observaciones String?
+
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  fecha     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fecha])
+}
+
+/// Movimientos entre cámaras frigoríficas (medias reses, productos).
+model MovimientoCamara {
+  id String @id @default(cuid())
+
+  camaraOrigenId  String?
+  camaraOrigen    Camara? @relation("CamaraOrigen", fields: [camaraOrigenId], references: [id])
+  camaraDestinoId String?
+  camaraDestino   Camara? @relation("CamaraDestino", fields: [camaraDestinoId], references: [id])
+
+  producto String? // Qué se movió
+  cantidad Int?
+  peso     Float?
+
+  // Trazabilidad
+  tropaCodigo String?
+  mediaResId  String?
+
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  observaciones String?
+  fecha         DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fecha])
+}
+
+/// Pesaje de subproductos internos por tropa (grasa, lavadito, bolsa azul, hueso, despojo).
+model PesajeInterno {
+  id            String    @id @default(cuid())
+  tropaCodigo   String    @unique
+  fecha         DateTime  @default(now())
+  grasa         Float     @default(0)
+  lavadito      Float     @default(0)
+  bolsaAzul     Float     @default(0)
+  hueso         Float     @default(0)
+  grasaBascula  Float     @default(0)
+  despojo       Float     @default(0)
+  operadorId    String?
+  operador      Operador? @relation(fields: [operadorId], references: [id])
+  observaciones String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tropaCodigo])
+  @@index([fecha])
+}
+
+// ============================================================
+// SECCIÓN 5: CICLO I — FAENA Y ROMANEO
+// ============================================================
+
+/// Lista diaria de faena con tropas a procesar, VB romaneo y costos aplicados.
+model ListaFaena {
+  id     String           @id @default(cuid())
+  numero Int              @unique // Número correlativo de lista (1, 2, 3...)
+  fecha  DateTime         @default(now())
+  estado EstadoListaFaena @default(ABIERTA)
+
+  cantidadTotal Int @default(0)
+
+  supervisorId String?
+  supervisor   Operador? @relation(fields: [supervisorId], references: [id])
+  fechaCierre  DateTime?
+
+  // VB Romaneo
+  vbRomaneo           Boolean   @default(false) // Visto bueno otorgado
+  vbRomaneoFecha      DateTime? // Fecha del VB
+  vbRomaneoOperadorId String? // Quien dio el VB
+  vbRomaneoOperador   Operador? @relation("VBRomaneoOperador", fields: [vbRomaneoOperadorId], references: [id])
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tropas          ListaFaenaTropa[]
+  asignaciones    AsignacionGarron[]
+  flujoFaena      FlujoFaena?
+  costosAplicados CostoFaenaAplicado[]
+  resumenCostos   ResumenCostosFaena?
+
+  @@index([fecha])
+  @@index([estado])
+  @@index([numero])
+  @@index([vbRomaneo])
+}
+
+/// Tropas incluidas en una lista de faena con cantidad de cabezas por corral.
+model ListaFaenaTropa {
+  id           String     @id @default(cuid())
+  listaFaenaId String
+  listaFaena   ListaFaena @relation(fields: [listaFaenaId], references: [id], onDelete: Cascade)
+
+  tropaId String
+  tropa   Tropa  @relation(fields: [tropaId], references: [id])
+
+  corralId String? // Corral del cual se toman los animales
+  corral   Corral? @relation(fields: [corralId], references: [id])
+
+  cantidad Int // Cantidad de animales de esta tropa a faenar
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([listaFaenaId, tropaId, corralId])
+  @@index([corralId])
+}
+
+/// Asignación de animales a garrones (hooks) de la cadena de faena.
+model AsignacionGarron {
+  id           String      @id @default(cuid())
+  listaFaenaId String?
+  listaFaena   ListaFaena? @relation(fields: [listaFaenaId], references: [id])
+
+  garron Int // Número de garrón (correlativo por día)
+
+  animalId String? @unique
+  animal   Animal? @relation(fields: [animalId], references: [id])
+
+  // Datos al momento de la asignación (se pueden modificar)
+  tropaCodigo  String? // Código de tropa (denormalizado)
+  animalNumero Int? // Número del animal dentro de la tropa
+  tipoAnimal   String? // Tipo de animal (VA, NO, etc.)
+  pesoVivo     Float? // Peso vivo al momento de asignar
+
+  // Operador que asignó
+  operadorId String?
+
+  // Estado de pesaje
+  tieneMediaDer Boolean @default(false)
+  tieneMediaIzq Boolean @default(false)
+  completado    Boolean @default(false)
+
+  // Hora de ingreso a faena
+  horaIngreso DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([listaFaenaId, garron])
+  @@index([garron])
+  @@index([horaIngreso])
+}
+
+/// Clasificación tipificadora de cada animal faenado (peso, dentición, tipo, rendimiento).
+model Romaneo {
+  id           String   @id @default(cuid())
+  listaFaenaId String?
+  fecha        DateTime @default(now())
+
+  // Datos del animal
+  garron       Int
+  tropaCodigo  String?
+  numeroAnimal Int?
+  tipoAnimal   TipoAnimal?
+  raza         String?
+  pesoVivo     Float? // KG ingreso
+
+  // Tipificación
+  denticion     String? // Cantidad de dientes
+  tipificadorId String?
+  tipificador   Tipificador? @relation(fields: [tipificadorId], references: [id])
+
+  // Pesos de medias reses
+  pesoMediaIzq Float?
+  pesoMediaDer Float?
+  pesoTotal    Float? // Suma de ambas medias
+
+  // Rinde
+  rinde Float? // Porcentaje
+
+  // Estado
+  estado            EstadoRomaneo @default(PENDIENTE)
+  supervisorId      String? // Quien confirma
+  fechaConfirmacion DateTime?
+  emailEnviado      Boolean       @default(false)
+
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mediasRes MediaRes[]
+  decomisos Decomiso[]
+
+  @@index([fecha])
+  @@index([garron])
+  @@index([estado])
+}
+
+/// Registro de decomisos (total o parcial) durante la faena, con peso y parte afectada.
+model Decomiso {
+  id     String       @id @default(cuid())
+  garron Int
+  tipo   TipoDecomiso
+
+  // Datos del animal
+  tropaCodigo   String?
+  motivo        String
+  pesoKg        Float?
+  peso          Float? // Peso del decomiso (alias)
+  parte         String? // Parte decomisada
+  observaciones String?
+
+  // Relación con media res
+  mediaResId String?
+  mediaRes   MediaRes? @relation("DecomisoMediaRes", fields: [mediaResId], references: [id])
+
+  // Relación con romaneo
+  romaneoId String?
+  romaneo   Romaneo? @relation(fields: [romaneoId], references: [id])
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  fecha     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([garron])
+  @@index([tipo])
+  @@index([fecha])
+  @@index([mediaResId])
+}
+
+/// Balance de faena por tropa: cabezas, peso vivo, peso frío, rinde, menudencias, merma.
+model BalanceFaena {
+  id              String   @id @default(cuid())
+  tropaId         String?
+  tropa           Tropa?   @relation(fields: [tropaId], references: [id])
+  fecha           DateTime @default(now())
+  pesoVivoTotal   Float    @default(0)
+  cantidadCabezas Int      @default(0)
+  pesoFrioTotal   Float    @default(0)
+  cantidadMedias  Int      @default(0)
+  rindePromedio   Float?
+  rindeMinimo     Float?
+  rindeMaximo     Float?
+  pesoMenudencias Float?
+  pesoMerma       Float?
+  porcentajeMerma Float?
+  facturaId       String?
+  factura         Factura? @relation(fields: [facturaId], references: [id])
+  centroCostoId   String?
+  observaciones   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tropaId])
+  @@index([facturaId])
+  @@index([fecha])
+}
+
+/// Flujo de trabajo de una lista de faena (verificación, VB, carga, reportes, romaneos).
+model FlujoFaena {
+  id            String     @id @default(cuid())
+  listaFaenaId  String     @unique
+  listaFaena    ListaFaena @relation(fields: [listaFaenaId], references: [id])
+  estado        String     @default("INICIADO")
+  fecha         DateTime   @default(now())
+  observaciones String?
+
+  // Flags de progreso del flujo de faena
+  datosVerificados Boolean @default(false)
+  vistoBueno       Boolean @default(false)
+  datosSubidos     Boolean @default(false)
+  reportesEmitidos Boolean @default(false)
+  romaneosEnviados Boolean @default(false)
+
+  // Timestamps de cada etapa
+  fechaVerificacion    DateTime?
+  fechaVistoBueno      DateTime?
+  comentarioVistoBueno String?
+  fechaSubida          DateTime?
+  fechaReportes        DateTime?
+  fechaEnvioRomaneos   DateTime?
+
+  verificadorId String?
+  verificador   Operador? @relation("FlujoVerificador", fields: [verificadorId], references: [id])
+  supervisorId  String?
+  supervisor    Operador? @relation("FlujoSupervisor", fields: [supervisorId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([estado])
+  @@index([fecha])
+}
+
+/// Registro de rendimiento por animal/tropa (peso vivo vs. peso frío, % rinde).
+model RindeFaena {
+  id              String    @id @default(cuid())
+  tropaId         String?
+  tropaCodigo     String?
+  numeroGarron    Int?
+  numeroAnimal    Int?
+  caravana        String?
+  raza            String?
+  tipoAnimal      String?
+  pesoVivo        Float
+  pesoMediaA      Float?
+  pesoMediaB      Float?
+  pesoTotalMedia  Float
+  rinde           Float
+  rindePorcentaje Float
+  fechaFaena      DateTime  @default(now())
+  matarife        String?
+  numeroDTE       String?
+  operadorId      String?
+  operador        Operador? @relation(fields: [operadorId], references: [id])
+  observaciones   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tropaId])
+  @@index([tropaCodigo])
+  @@index([fechaFaena])
+}
+
+/// Sesión activa de un tipificador en la estación de romaneo.
+model SesionRomaneo {
+  id            String       @id @default(cuid())
+  operadorId    String
+  operador      Operador     @relation("SesionRomaneoOperador", fields: [operadorId], references: [id])
+  tipificadorId String?
+  tipificador   Tipificador? @relation(fields: [tipificadorId], references: [id])
+  camaraId      String?
+  camara        Camara?      @relation(fields: [camaraId], references: [id])
+  ultimoGarron  Int?
+  activa        Boolean      @default(true)
+  fechaInicio   DateTime     @default(now())
+  fechaFin      DateTime?
+
+  @@index([operadorId])
+  @@index([activa])
+}
+
+/// Historial mensual de rendimientos promedio por especie y tipo de animal.
+model RendimientoHistorico {
+  id               String     @id @default(cuid())
+  anio             Int
+  mes              Int
+  especie          Especie
+  tipoAnimal       TipoAnimal
+  cantidadAnimales Int        @default(0)
+  pesoVivoPromedio Float?
+  pesoFrioPromedio Float?
+  rindePromedio    Float?
+  rindeMinimo      Float?
+  rindeMaximo      Float?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@unique([anio, mes, especie, tipoAnimal], name: "rendimientoHistorico_anio_mes_especie_tipo")
+  @@index([anio])
+  @@index([mes])
+  @@index([especie])
+}
+
+/// Configuración de costos de faena aplicables (fijos, variables, por especie).
+model CostoFaena {
+  id          String    @id @default(cuid())
+  nombre      String
+  descripcion String?
+  tipo        String
+  monto       Decimal @db.Decimal(12, 2)
+  monedaId    String?
+  aplicaA     String    @default("TODOS")
+  fechaDesde  DateTime  @default(now())
+  fechaHasta  DateTime?
+  activo      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  costosAplicados CostoFaenaAplicado[]
+
+  @@index([tipo])
+  @@index([activo])
+}
+
+/// Costos de faena aplicados a una lista de faena específica.
+model CostoFaenaAplicado {
+  id            String     @id @default(cuid())
+  listaFaenaId  String
+  listaFaena    ListaFaena @relation(fields: [listaFaenaId], references: [id])
+  costoFaenaId  String
+  costoFaena    CostoFaena @relation(fields: [costoFaenaId], references: [id])
+  cantidad      Int        @default(1)
+  montoUnitario Decimal @db.Decimal(12, 2)
+  montoTotal    Decimal @db.Decimal(12, 2)
+  observaciones String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([listaFaenaId])
+  @@index([costoFaenaId])
+}
+
+/// Resumen consolidado de costos por lista de faena (costo total, por kg, por animal).
+model ResumenCostosFaena {
+  id             String     @id @default(cuid())
+  listaFaenaId   String     @unique
+  listaFaena     ListaFaena @relation(fields: [listaFaenaId], references: [id])
+  totalAnimales  Int?
+  totalKg        Float?
+  costoTotal     Decimal      @default(0) @db.Decimal(12, 2)
+  costoPorKg     Decimal? @db.Decimal(12, 2)
+  costoPorAnimal Decimal? @db.Decimal(12, 2)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+/// Estados de lista de faena: BORRADOR, ABIERTA, EN_PROCESO, CERRADA, ANULADA.
+enum EstadoListaFaena {
+  BORRADOR // Capa 2: Lista en edición, auto-guardada
+  ABIERTA
+  EN_PROCESO
+  CERRADA
+  ANULADA
+}
+
+/// Estados de romaneo: BORRADOR (auto-guardado), PENDIENTE, CONFIRMADO, ANULADO.
+enum EstadoRomaneo {
+  BORRADOR // Capa 2: Romaneo en progreso, auto-guardado
+  PENDIENTE
+  CONFIRMADO
+  ANULADO
+}
+
+/// Tipos de decomiso: TOTAL o PARCIAL.
+enum TipoDecomiso {
+  TOTAL
+  PARCIAL
+}
+
+// ============================================================
+// SECCIÓN 6: CICLO I — STOCK Y EXPEDICIÓN
+// ============================================================
+
+/// Media res resultante del faenado (izquierda/derecha) con código de barras, peso y cámara.
+model MediaRes {
+  id        String  @id @default(cuid())
+  romaneoId String
+  romaneo   Romaneo @relation(fields: [romaneoId], references: [id])
+
+  lado  LadoMedia // IZQUIERDA o DERECHA
+  peso  Float
+  sigla SiglaMedia @default(A) // A, T, D
+
+  // Código de barras
+  codigo String @unique
+
+  // Estado
+  estado EstadoMediaRes @default(EN_CAMARA)
+
+  // Cámara
+  camaraId String?
+  camara   Camara? @relation(fields: [camaraId], references: [id])
+
+  // Usuario de faena (dueño de la media res)
+  usuarioFaenaId String? // ID del cliente usuario de faena
+  usuarioFaena   Cliente? @relation(fields: [usuarioFaenaId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  despachoItems DespachoItem[]
+
+  // Facturación
+  facturado Boolean    @default(false) // Si ya fue facturada
+  facturaId String? // ID de la factura donde se facturó
+  cuartos   Cuarto[]
+  decomisos Decomiso[] @relation("DecomisoMediaRes")
+  medicionesPH MedicionPH[]
+
+  @@unique([romaneoId, lado, sigla])
+  @@index([estado])
+  @@index([usuarioFaenaId])
+}
+
+/// Stock actual de medias reses por cámara, tropa y especie (cantidades y kg).
+model StockMediaRes {
+  id       String @id @default(cuid())
+  camaraId String
+  camara   Camara @relation(fields: [camaraId], references: [id])
+
+  tropaCodigo String?
+  especie     Especie
+
+  cantidad  Int   @default(0)
+  pesoTotal Float @default(0)
+
+  fechaIngreso DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([camaraId, tropaCodigo, especie])
+}
+
+/// Orden de despacho de medias reses (Ciclo I): transporte, cliente, precintos, pesaje.
+model Despacho {
+  id     String   @id @default(cuid())
+  numero Int      @unique // Número correlativo de despacho
+  fecha  DateTime @default(now())
+
+  // Destino
+  destino          String // Destino del despacho
+  direccionDestino String? // Dirección de entrega
+
+  // Datos del camión
+  patenteCamion   String? // Patente del camión
+  patenteAcoplado String? // Patente del acoplado
+  chofer          String? // Nombre del chofer
+  choferDni       String? // DNI del chofer
+  patenteChasis   String? // Patente del chasis (alternativa)
+  choferNombre    String? // Nombre del chofer (alternativa)
+  transportista   String? // Nombre del transportista
+  transportistaId String? // ID del transportista (si está registrado)
+
+  // Cliente
+  clienteId String?
+  cliente   Cliente? @relation("DespachoCliente", fields: [clienteId], references: [id])
+
+  // Documentos
+  remito          String? // Número de remito
+  numeroPrecintos String? // Números de precintos separados por coma
+
+  // Pesos
+  kgTotal        Float @default(0) // Total de KG despachados
+  cantidadMedias Int   @default(0) // Total de medias reses
+
+  // Ticket de pesaje (salida con mercadería)
+  ticketPesajeId String? // ID del pesaje de camión de salida
+  ticketPesaje   PesajeCamion? @relation(fields: [ticketPesajeId], references: [id])
+
+  // Pesaje de salida (asociado al pesaje de camión de salida)
+  pesajeCamionId String?       @unique
+  pesajeCamion   PesajeCamion? @relation("DespachoPesajeCamion", fields: [pesajeCamionId], references: [id])
+
+  // Estado
+  estado EstadoDespacho @default(PENDIENTE)
+
+  // Observaciones
+  observaciones String?
+
+  // Operador que registró
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items      DespachoItem[]
+  lineas     DespachoItem[] @relation("DespachoLineas")
+  ordenCarga OrdenCarga?
+
+  // Facturación
+  facturado        Boolean   @default(false) // Si ya fue facturado (todas las medias)
+  fechaFacturacion DateTime? // Fecha en que se generó la factura
+  facturas         Factura[] // Facturas generadas desde este despacho
+  facturaId        String? // ID de la última factura asociada
+  fechaDespacho    DateTime? // Fecha de despacho efectivo
+
+  @@index([fecha])
+  @@index([estado])
+  @@index([destino])
+  @@index([clienteId])
+}
+
+/// Items (medias reses) incluidos en un despacho, con datos denormalizados.
+model DespachoItem {
+  id              String    @id @default(cuid())
+  despachoId      String
+  despacho        Despacho  @relation(fields: [despachoId], references: [id], onDelete: Cascade)
+  despachoLineaId String?
+  despachoLinea   Despacho? @relation("DespachoLineas", fields: [despachoLineaId], references: [id])
+
+  // Media res despachada
+  mediaResId String
+  mediaRes   MediaRes @relation(fields: [mediaResId], references: [id])
+
+  // Datos denormalizados para reportes
+  tropaCodigo String? // Código de tropa
+  garron      Int? // Número de garrón
+  peso        Float // Peso de la media res
+  camaraId    String? // Cámara de origen (para restaurar al anular)
+
+  // Usuario (cliente) al que pertenece
+  usuarioId     String? // ID del usuario de faena
+  usuarioNombre String? // Nombre del usuario (denormalizado)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([despachoId])
+  @@index([tropaCodigo])
+  @@index([usuarioId])
+  @@index([camaraId])
+}
+
+/// Documento de orden de carga asociado a un despacho (firmas, temperatura, precintos).
+model OrdenCarga {
+  id               String    @id @default(cuid())
+  despachoId       String    @unique
+  despacho         Despacho  @relation(fields: [despachoId], references: [id])
+  numero           Int
+  codigo           String
+  horaPreparacion  String
+  estado           String    @default("PENDIENTE")
+  firmaOperario    String?
+  firmaChofer      String?
+  tempCargaOK      Boolean?
+  tempTransporteOK Boolean?
+  precintosOK      Boolean?
+  fechaPreparacion DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([estado])
+}
+
+/// Lado de la media res: IZQUIERDA o DERECHA.
+enum LadoMedia {
+  IZQUIERDA
+  DERECHA
+}
+
+/// Sigla de la media res: A (Asado), T (Trasero), D (Delantero).
+enum SiglaMedia {
+  A // Asado
+  T // Trasero
+  D // Delantero
+}
+
+/// Estados de media res: EN_CAMARA, EN_CUARTEO, DESPACHADO.
+enum EstadoMediaRes {
+  EN_CAMARA
+  EN_CUARTEO
+  DESPACHADO
+}
+
+/// Estados de despacho: PENDIENTE → EN_CARGA → DESPACHADO → ENTREGADO / ANULADO.
+enum EstadoDespacho {
+  PENDIENTE // En preparación
+  EN_CARGA // Cargando en camión
+  DESPACHADO // Despachado
+  ENTREGADO // Entregado en destino
+  ANULADO // Anulado
+}
+
+// ============================================================
+// SECCIÓN 7: CICLO II — DESPOSTE Y CUARTEO
+// ============================================================
+
+/// Lote de producción de despostada que agrupa movimientos, empaques e ingresos.
+model LoteDespostada {
+  id     String @id @default(cuid())
+  numero Int    @unique
+
+  // Fecha y estado
+  fecha  DateTime   @default(now())
+  estado EstadoLote @default(ABIERTO)
+
+  // Total de kg procesados
+  totalKg Float @default(0)
+
+  // Observaciones
+  observaciones String?
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  movimientos MovimientoDespostada[]
+  empaques    RegistroEmpaque[]
+  ingresos    IngresoDespostada[]
+  cajas       CajaEmpaque[]
+
+  @@index([fecha])
+  @@index([estado])
+}
+
+/// Movimientos de despostada (cortes, hueso, grasa, merma, desecho) con pesajes.
+model MovimientoDespostada {
+  id     String          @id @default(cuid())
+  loteId String?
+  lote   LoteDespostada? @relation(fields: [loteId], references: [id])
+
+  // Tipo de movimiento
+  tipo TipoMovimientoDespostada
+
+  // Producto/Corte
+  productoId     String?
+  productoNombre String
+
+  // Pesos
+  pesoBruto       Float @default(0) // Peso antes de limpieza
+  pesoNeto        Float @default(0) // Peso después de limpieza
+  pesoDesperdicio Float @default(0) // Diferencia (merma)
+
+  // Destino del corte
+  destino DestinoCorte? @default(PRODUCCION)
+
+  // Causa del desperdicio (si aplica)
+  causa String?
+
+  // Tropa de origen
+  tropaCodigo String?
+
+  // Observaciones
+  observaciones String?
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  fecha     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([loteId])
+  @@index([tipo])
+  @@index([fecha])
+}
+
+/// Registro de cuarteo de medias reses (peso total, delantero, trasero, cámara destino).
+model RegistroCuarteo {
+  id String @id @default(cuid())
+
+  // Media res original
+  mediaResId String?
+
+  // Tipo de corte
+  tipoCorte TipoCuarteo @default(DELANTERO_TRASERO)
+
+  // Pesos
+  pesoTotal     Float
+  pesoDelantero Float?
+  pesoTrasero   Float?
+
+  // Cámara destino
+  camaraId String?
+  camara   Camara? @relation(fields: [camaraId], references: [id])
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  // Observaciones
+  observaciones String?
+
+  fecha     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fecha])
+  @@index([tipoCorte])
+}
+
+/// Ingreso de medias reses/cuartos a la sala de desposte (Ciclo II).
+model IngresoDespostada {
+  id String @id @default(cuid())
+
+  // Media de origen
+  mediaResId String?
+
+  // Datos de la media
+  tropaCodigo String?
+  mediaCodigo String? // Código de la media res
+  tipoMedia   TipoMedia @default(DELANTERA)
+
+  // Peso
+  pesoKg Float @default(0)
+
+  // Origen y destino
+  camaraOrigenId  String?
+  camaraOrigen    Camara? @relation("IngresoOrigen", fields: [camaraOrigenId], references: [id])
+  camaraDestinoId String?
+  camaraDestino   Camara? @relation("IngresoDestino", fields: [camaraDestinoId], references: [id])
+
+  // Lote de despostada
+  loteId String?
+  lote   LoteDespostada? @relation(fields: [loteId], references: [id])
+
+  // Estado
+  estado EstadoIngreso @default(PENDIENTE)
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  observaciones String?
+
+  fecha     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tropaCodigo])
+  @@index([estado])
+  @@index([fecha])
+}
+
+/// Cuarto de media res (delantero/trasero/asado) con código de barras, propietario y estado.
+model Cuarto {
+  id           String        @id @default(cuid())
+  mediaResId   String // Origin media res
+  mediaRes     MediaRes      @relation(fields: [mediaResId], references: [id])
+  tipo         TipoCuarto // DELANTERO, TRASERO
+  tipoCuartoId String?
+  tipoCuarto   C2TipoCuarto? @relation(fields: [tipoCuartoId], references: [id])
+  peso         Float
+  codigo       String        @unique // Barcode
+
+  // Trazabilidad
+  tropaCodigo String?
+  garron      Int?
+  sigla       SiglaMedia @default(A)
+
+  // Ubicación
+  camaraId String?
+  camara   Camara? @relation(fields: [camaraId], references: [id])
+
+  // Propietario
+  propietarioId String?
+  propietario   Cliente? @relation("CuartoPropietario", fields: [propietarioId], references: [id])
+
+  // Estado
+  estado EstadoCuarto @default(EN_CAMARA)
+
+  // Registro cuarteo
+  registroCuarteoId   String?
+  ingresoDespostadaId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cajas CajaEmpaque[]
+
+  @@index([estado])
+  @@index([camaraId])
+  @@index([propietarioId])
+  @@index([tipoCuartoId])
+}
+
+/// Rubros agrupadores de productos de desposte (Cortes Traseros, Delanteros, Menudencias).
+model C2Rubro {
+  id          String  @id @default(cuid())
+  nombre      String  @unique // Ej: Cortes Traseros, Cortes Delanteros, Menudencias, Elaborados
+  descripcion String?
+  orden       Int     @default(0) // Orden de aparición en UI
+  activo      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productos C2ProductoDesposte[]
+
+  @@index([activo])
+  @@index([orden])
+}
+
+/// Tipos de cuarto configurables (Delantero, Trasero, Asado) con código para rótulos.
+model C2TipoCuarto {
+  id          String  @id @default(cuid())
+  nombre      String  @unique // Ej: Delantero, Trasero, Asado
+  codigo      String  @unique // Ej: DEL, TRA, ASA (para rótulos/códigos)
+  descripcion String?
+  orden       Int     @default(0) // Orden de aparición en pantalla de cuarteo
+  activo      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cuartos Cuarto[]
+
+  @@index([activo])
+  @@index([orden])
+}
+
+/// Productos de desposte (cortes individuales) con GTIN, conservación y precio.
+model C2ProductoDesposte {
+  id      String  @id @default(cuid())
+  rubroId String // FK a C2Rubro
+  rubro   C2Rubro @relation(fields: [rubroId], references: [id])
+
+  nombre String // Ej: Lomo, Bife de Chorizo, Nalga
+  codigo String @unique // Código interno individual del producto
+
+  // Código GS1 / GTIN para etiquetas GS1-128
+  gtin String? // GTIN del producto (14 dígitos)
+
+  // Especie
+  especie Especie @default(BOVINO)
+
+  // Clasificación del cuarto de origen (de qué cuarto sale este corte)
+  tipoCuartoOrigen String? // DELANTERO, TRASERO, ASADO - de qué cuarto proviene normalmente
+
+  // Datos de conservación
+  diasVencimiento Int? // Días de vida útil
+  tempMin         Float? // Temperatura mínima de conservación
+  tempMax         Float? // Temperatura máxima de conservación
+
+  // Tara del envase
+  pesoTaraCaja Float? // Peso de la caja/bolsa (tara)
+
+  // Precios (para facturación de cortes)
+  precioKg Decimal? @db.Decimal(12, 2) // Precio por KG
+
+  // Reportes
+  apareceRendimiento Boolean @default(true) // Aparece en reporte de rinde
+  apareceStock       Boolean @default(true) // Aparece en stock
+
+  activo        Boolean @default(true)
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bomItems           C2BOM[]
+  cajas              CajaEmpaque[]
+  stockProductos     StockProducto[]
+  degradacionesHacia C2MovimientoDegradacion[] @relation("ProductoDegradadoHacia")
+
+  @@index([rubroId])
+  @@index([especie])
+  @@index([activo])
+  @@index([tipoCuartoOrigen])
+}
+
+/// Registro de degradación excepcional de cajas (golpeado, trimming, decomiso parcial).
+model C2MovimientoDegradacion {
+  id String @id @default(cuid())
+
+  // Caja original
+  cajaIdOriginal String // ID de la caja degradada
+  cajaOriginal   CajaEmpaque @relation("CajaDegradada", fields: [cajaIdOriginal], references: [id])
+
+  // Tipo de degradación
+  tipo TipoDegradacion @default(TRIMMING)
+
+  // Pesos
+  pesoDegradado       Float // Peso del corte degradado
+  pesoAprovechamiento Float? // Peso que se puede reutilizar (si aplica)
+  pesoDescarte        Float? // Peso que se descarta
+
+  // Nuevo producto (si el aprovechamiento se reasigna)
+  nuevoProductoId String? // FK a C2ProductoDesposte (ej: Lomo degradado → Carne para milanesa)
+  nuevoProducto   C2ProductoDesposte? @relation("ProductoDegradadoHacia", fields: [nuevoProductoId], references: [id])
+
+  // Motivo
+  motivo String // Ej: "Golpeado", "Contaminación superficial", "Vencimiento próximo"
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  observaciones String?
+  fecha         DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cajaIdOriginal])
+  @@index([tipo])
+  @@index([fecha])
+}
+
+/// Estados de lote de despostada: ABIERTO, CERRADO, ANULADO.
+enum EstadoLote {
+  ABIERTO
+  CERRADO
+  ANULADO
+}
+
+/// Tipos de movimiento de despostada: CORTE, HUESO, GRASA, MERMA, DESECHO.
+enum TipoMovimientoDespostada {
+  CORTE
+  HUESO
+  GRASA
+  MERMA
+  DESECHO
+}
+
+/// Destino del corte despostado: PRODUCCION, RECORTE, DESECHO.
+enum DestinoCorte {
+  PRODUCCION
+  RECORTE
+  DESECHO
+}
+
+/// Tipo de media res: DELANTERA, TRASERA, ENTERA.
+enum TipoMedia {
+  DELANTERA
+  TRASERA
+  ENTERA
+}
+
+/// Estados de ingreso a despostada: PENDIENTE, INGRESADO, EN_PROCESO, PROCESADO, DEVUELTO, ANULADO.
+enum EstadoIngreso {
+  PENDIENTE
+  INGRESADO
+  EN_PROCESO
+  PROCESADO
+  DEVUELTO
+  ANULADO
+}
+
+/// Tipos de cuarto: DELANTERO, TRASERO, ASADO.
+enum TipoCuarto {
+  DELANTERO
+  TRASERO
+  ASADO
+}
+
+/// Estados de cuarto: EN_CAMARA, EN_DESPOSTADA, DESPACHADO.
+enum EstadoCuarto {
+  EN_CAMARA
+  EN_DESPOSTADA
+  DESPACHADO
+}
+
+/// Tipos de degradación de producto: TRIMMING, GOLPEADO, DECOMISO_PARCIAL, APROVECHAMIENTO.
+enum TipoDegradacion {
+  TRIMMING // Recorte de grasa/limpieza
+  GOLPEADO // Corte golpeado
+  DECOMISO_PARCIAL // Decomiso parcial
+  APROVECHAMIENTO // Reasignación a producto de menor valor
+}
+
+/// Tipos de cuarteo: DELANTERO_TRASERO, CUARTOS_IGUALES, OTRO.
+enum TipoCuarteo {
+  DELANTERO_TRASERO
+  CUARTOS_IGUALES
+  OTRO
+}
+
+// ============================================================
+// SECCIÓN 8: CICLO II — EMPAQUE Y PRODUCCIÓN
+// ============================================================
+
+/// Plantilla de rótulo/etiqueta (ZPL o DPL) con dimensiones, variables y contenido.
+model Rotulo {
+  id     String @id @default(cuid())
+  nombre String // Nombre del rótulo
+  codigo String @unique // Código interno (MEDIA_RES, CUARTO, etc.)
+
+  // Tipo y categoría
+  tipo      TipoRotulo
+  categoria String? // ENVASE_PRIMARIO, ENVASE_SECUNDARIO, etc.
+
+  // Tipo de impresora: ZEBRA (ZPL) o DATAMAX (DPL)
+  tipoImpresora   String  @default("ZEBRA") // ZEBRA | DATAMAX
+  modeloImpresora String? @default("ZT410") // ZT410, ZT230, MARK_II, etc.
+
+  // Dimensiones en mm
+  ancho Int @default(80)
+  alto  Int @default(50)
+  dpi   Int @default(203) // Resolución: 203, 300, 600
+
+  // Contenido de la plantilla (raw del archivo)
+  contenido     String // Contenido del archivo ZPL o DPL
+  variables     String? // JSON con variables detectadas
+  nombreArchivo String? // Nombre del archivo original
+  esBinario     Boolean @default(false) // Archivo .lbl/.nlbl (Zebra Designer)
+
+  // Configuración de consumo
+  diasConsumo    Int?   @default(30) // Días para consumir
+  temperaturaMax Float? @default(5.0)
+
+  // Estado
+  activo    Boolean @default(true)
+  esDefault Boolean @default(false) // Si es el rótulo por defecto del tipo
+
+  // Elementos para editor visual
+  elementos RotuloElemento[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([activo])
+  @@index([tipoImpresora])
+}
+
+/// Registro de empaque de productos cortados con código de paquete.
+model RegistroEmpaque {
+  id String @id @default(cuid())
+
+  // Identificación del paquete
+  paqueteId String @unique // Código del paquete (EMP-2024-0001)
+
+  // Producto
+  producto   String // Nombre del producto
+  productoId String? // ID del producto (si existe en catálogo)
+
+  // Cantidad y peso
+  pesoKg   Float @default(0) // Peso por unidad
+  cantidad Int   @default(1) // Cantidad de unidades
+
+  // Destino
+  destino  String? // Cámara o destino final
+  camaraId String?
+  camara   Camara? @relation(fields: [camaraId], references: [id])
+
+  // Estado
+  estado EstadoEmpaque @default(PENDIENTE)
+
+  // Lote de origen (despostada)
+  loteId String?
+  lote   LoteDespostada? @relation(fields: [loteId], references: [id])
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  // Fecha de despacho
+  fechaDespacho DateTime?
+
+  observaciones String?
+
+  fecha     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([producto])
+  @@index([estado])
+  @@index([fecha])
+}
+
+/// Elementos individuales de un rótulo (texto, código de barras, líneas, rectángulos).
+model RotuloElemento {
+  id       String @id @default(cuid())
+  rotuloId String
+  rotulo   Rotulo @relation(fields: [rotuloId], references: [id], onDelete: Cascade)
+
+  // Tipo de elemento
+  tipo String // TEXTO, CODIGO_BARRAS, LINEA, RECTANGULO, IMAGEN
+
+  // Datos del campo (para TEXTO y CODIGO_BARRAS)
+  campo     String? // Variable: numeroAnimal, peso, fecha, etc. (null = texto fijo)
+  textoFijo String? // Texto estático si campo es null
+
+  // Posición y tamaño (en puntos según DPI)
+  posX  Int  @default(0) // Posición X en puntos
+  posY  Int  @default(0) // Posición Y en puntos
+  ancho Int? @default(100) // Ancho en puntos
+  alto  Int? @default(30) // Alto en puntos
+
+  // Fuente (para TEXTO)
+  fuente      String? @default("0") // ZPL: 0-9, A-Z; DPL: nombre de fuente
+  tamano      Int?    @default(10) // Tamaño de fuente
+  negrita     Boolean @default(false)
+  anchoFuente Int?    @default(0) // Ancho de carácter en puntos (ZPL)
+
+  // Alineación
+  alineacion String? @default("LEFT") // LEFT, CENTER, RIGHT
+
+  // Código de barras
+  tipoCodigo   String? @default("CODE128") // CODE128, CODE39, EAN13, etc.
+  altoCodigo   Int?    @default(60) // Alto del código de barras
+  mostrarTexto Boolean @default(true) // Mostrar texto debajo del código
+
+  // Líneas y rectángulos
+  grosorLinea Int?    @default(2) // Grosor en puntos
+  color       String? @default("B") // B=Black, W=White
+
+  // Orden (z-index)
+  orden Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([rotuloId])
+  @@index([tipo])
+}
+
+/// Pallet que agrupa múltiples cajas de empaque para expedición.
+model Pallet {
+  id       String  @id @default(cuid())
+  numero   String  @unique
+  ssccCode String? @unique
+
+  // Expedición
+  expedicionId String?
+
+  // Contenido
+  cajas CajaEmpaque[]
+
+  // Estado
+  estado  EstadoPallet @default(ARMADO)
+  esMixto Boolean      @default(false)
+
+  // Peso total
+  pesoTotal     Float @default(0)
+  cantidadCajas Int   @default(0)
+
+  // Ubicación
+  camaraId String?
+  camara   Camara? @relation(fields: [camaraId], references: [id])
+
+  observaciones     String?
+  expedicionOrdenId String?
+
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([estado])
+  @@index([expedicionId])
+  @@index([esMixto])
+}
+
+/// Caja de empaque con producto, peso, tara, código de barras GS1-128 y trazabilidad.
+model CajaEmpaque {
+  id     String @id @default(cuid())
+  numero String @unique
+
+  // Pallet
+  palletId String?
+  pallet   Pallet? @relation(fields: [palletId], references: [id])
+
+  // Producto (Ciclo I - legado)
+  productoId String?
+  producto   Producto? @relation(fields: [productoId], references: [id])
+
+  // Producto de Desposte (Ciclo II)
+  productoDesposteId String?
+  productoDesposte   C2ProductoDesposte? @relation(fields: [productoDesposteId], references: [id])
+
+  // Cuarto de origen
+  cuartoId String?
+  cuarto   Cuarto? @relation(fields: [cuartoId], references: [id])
+
+  // Lote
+  loteId String?
+  lote   LoteDespostada? @relation(fields: [loteId], references: [id])
+
+  // Propietario
+  propietarioId String?
+  propietario   Cliente? @relation("CajaPropietario", fields: [propietarioId], references: [id])
+
+  // Peso
+  pesoBruto Float @default(0)
+  pesoNeto  Float @default(0)
+  tara      Float @default(0)
+  piezas    Int   @default(1) // Cantidad de piezas en la caja
+
+  // Trazabilidad
+  tropaCodigo String?
+
+  // Fechas de trazabilidad (Ciclo II)
+  fechaFaena       DateTime? // Fecha de faena (heredada)
+  fechaDesposte    DateTime? // Fecha de desposte
+  fechaVencimiento DateTime? // Fecha de vencimiento
+
+  // Estado
+  estado EstadoCaja @default(ARMADA)
+
+  // Código de barras
+  codigoBarras   String? // Código legado
+  barcodeGs1_128 String? // GS1-128 completo (generado)
+
+  // Degradaciones (C2) - excepcional
+  degradaciones C2MovimientoDegradacion[] @relation("CajaDegradada")
+
+  // Expediciones (C2)
+  expedicionItems C2ExpedicionItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([palletId])
+  @@index([productoId])
+  @@index([productoDesposteId])
+  @@index([estado])
+  @@index([tropaCodigo])
+  @@index([fechaFaena])
+}
+
+/// Bill of Materials: insumos consumidos por cada caja de producto de desposte.
+model C2BOM {
+  id                 String             @id @default(cuid())
+  productoDesposteId String // FK al producto de desposte
+  productoDesposte   C2ProductoDesposte @relation(fields: [productoDesposteId], references: [id], onDelete: Cascade)
+
+  insumoId String // FK al insumo
+  insumo   Insumo @relation(fields: [insumoId], references: [id])
+
+  cantidadPorCaja Float @default(1) // Cantidad de este insumo por cada caja producida
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productoDesposteId, insumoId])
+  @@index([productoDesposteId])
+  @@index([insumoId])
+}
+
+/// Orden de expedición de cajas/pallets (Ciclo II) con cliente y transporte.
+model C2ExpedicionOrden {
+  id     String @id @default(cuid())
+  numero Int    @unique // Número correlativo
+
+  // Cliente
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
+  // Datos de transporte
+  transporteNombre String?
+  patenteCamion    String?
+  choferNombre     String?
+  choferDni        String?
+
+  // Documentos
+  nroRemito String?
+
+  // Fechas
+  fechaDespacho DateTime?
+  fecha         DateTime  @default(now())
+
+  // Estado
+  estado EstadoExpedicion @default(PENDIENTE)
+
+  // Totales
+  cantidadCajas Int   @default(0)
+  pesoTotal     Float @default(0)
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items C2ExpedicionItem[]
+
+  @@index([clienteId])
+  @@index([estado])
+  @@index([fecha])
+}
+
+/// Items individuales de una expedición (cajas individuales).
+model C2ExpedicionItem {
+  id      String            @id @default(cuid())
+  ordenId String
+  orden   C2ExpedicionOrden @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+
+  // Caja despachada
+  cajaId String
+  caja   CajaEmpaque @relation(fields: [cajaId], references: [id])
+
+  // Pallet (si despacha por pallet)
+  palletId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ordenId])
+  @@index([cajaId])
+  @@index([palletId])
+}
+
+/// Tipos de rótulo según tipo de producto: media res, cuarto, menudencia, producto terminado.
+enum TipoRotulo {
+  PESAJE_INDIVIDUAL
+  MEDIA_RES
+  CUARTO
+  MENUDENCIA
+  PRODUCTO_TERMINADO_ENVASE_PRIMARIO
+  PRODUCTO_TERMINADO_ENVASE_SECUNDARIO
+  PRODUCTO_TERMINADO_UN_ENVASE
+}
+
+/// Estados de empaque: PENDIENTE, EMPACADO, DESPACHADO, ANULADO.
+enum EstadoEmpaque {
+  PENDIENTE
+  EMPACADO
+  DESPACHADO
+  ANULADO
+}
+
+/// Estados de pallet: ARMADO, EN_CAMARA, DESPACHADO.
+enum EstadoPallet {
+  ARMADO
+  EN_CAMARA
+  DESPACHADO
+}
+
+/// Estados de caja de empaque: ARMADA, EN_PALLET, EN_CAMARA, DESPACHADA.
+enum EstadoCaja {
+  ARMADA
+  EN_PALLET
+  EN_CAMARA
+  DESPACHADA
+}
+
+/// Estados de expedición C2: PENDIENTE, EN_PREPARACION, DESPACHADO, ANULADO.
+enum EstadoExpedicion {
+  PENDIENTE
+  EN_PREPARACION
+  DESPACHADO
+  ANULADO
+}
+
+// ============================================================
+// SECCIÓN 9: CICLO II — SUBPRODUCTOS Y DESPACHO
+// ============================================================
+
+/// Pesaje de subproductos de desposte (hueso, grasa, incomestible, recortes).
+model C2SubproductoPesaje {
+  id String @id @default(cuid())
+
+  // Tipo de subproducto
+  tipo TipoSubproducto @default(HUESO)
+
+  // Tropa de origen
+  tropaCodigo String?
+
+  // Peso
+  pesoKg Float @default(0)
+
+  // Destino
+  destino String? // Ej: "Rendering", "Venta directa"
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  observaciones String?
+  fecha         DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([tropaCodigo])
+  @@index([fecha])
+}
+
+/// Tipos de subproducto de desposte: HUESO, GRASA, INCOMESTIBLE, RECORTES, OTRO.
+enum TipoSubproducto {
+  HUESO
+  GRASA
+  INCOMESTIBLE
+  RECORTES
+  OTRO
+}
+
+// ============================================================
+// SECCIÓN 10: SUBPRODUCTOS — CONSUMO (MENUDENCIAS, CUEROS)
+// ============================================================
+
+/// Catálogo de tipos de menudencias (corazón, hígado, mondongo, etc.).
+model TipoMenudencia {
+  id            String  @id @default(cuid())
+  nombre        String  @unique
+  activo        Boolean @default(true)
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  menudencias Menudencia[]
+}
+
+/// Registro de menudencias por tropa (peso, bolsas, elaboración, rótulo).
+model Menudencia {
+  id               String         @id @default(cuid())
+  tipoMenudenciaId String
+  tipoMenudencia   TipoMenudencia @relation(fields: [tipoMenudenciaId], references: [id])
+
+  tropaCodigo String?
+
+  // Pesos
+  pesoIngreso   Float? // KG al ingresar a cámara
+  pesoElaborado Float? // KG después de elaboración
+
+  // Bolsas
+  numeroBolsa    Int?
+  cantidadBolsas Int?
+
+  // Operadores
+  operadorElaboracion String?
+
+  fechaIngreso     DateTime  @default(now())
+  fechaElaboracion DateTime?
+
+  // Rótulo
+  rotuloImpreso Boolean @default(false)
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tropaCodigo])
+  @@index([fechaIngreso])
+}
+
+/// Registro de cueros (salados, frescos, cortados) con destino y remito de despacho.
+model Cuero {
+  id          String   @id @default(cuid())
+  fecha       DateTime @default(now())
+  tropaCodigo String?
+
+  // Cantidad y peso
+  cantidad Int   @default(1)
+  pesoKg   Float
+
+  // Categoría: SALADO, FRESCO, CORTADO
+  conservacion ConservacionCuero @default(SALADO)
+
+  // Destino
+  destino     String? // Curtiembre o cliente
+  tipoDestino TipoDestinoCuero? @default(CURTIEMBRE)
+
+  // Estado
+  estado EstadoCuero @default(PENDIENTE)
+
+  // Remito de despacho
+  remito        String?
+  fechaDespacho DateTime?
+
+  // Observaciones
+  observaciones String?
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fecha])
+  @@index([estado])
+  @@index([conservacion])
+}
+
+/// Registro de grasa de dressing (rendering, comestible) por tropa.
+model GrasaDressing {
+  id          String  @id @default(cuid())
+  tropaCodigo String?
+  garron      Int?
+
+  // Tipo
+  tipo TipoGrasa @default(RENDERING)
+
+  // Peso
+  pesoTotal Float @default(0)
+
+  // Estado
+  enStock Boolean @default(true)
+
+  // Fechas
+  fechaFaena DateTime @default(now())
+
+  // Destino
+  destino String?
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tropaCodigo])
+  @@index([fechaFaena])
+  @@index([enStock])
+}
+
+/// Registro de subproductos incomestibles con destino y precio de venta.
+model SubproductoIncomestible {
+  id            String    @id @default(cuid())
+  tipo          String
+  descripcion   String?
+  kilos         Float
+  cantidad      Int?
+  tropaCodigo   String?
+  fechaFaena    DateTime?
+  destino       String?
+  clienteId     String?
+  precioKg      Decimal? @db.Decimal(12, 2)
+  montoTotal    Decimal? @db.Decimal(12, 2)
+  estado        String    @default("DISPONIBLE")
+  operadorId    String?
+  fecha         DateTime  @default(now())
+  observaciones String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tipo])
+  @@index([estado])
+  @@index([fecha])
+}
+
+/// Tipos de conservación de cuero: SALADO, FRESCO, CORTADO.
+enum ConservacionCuero {
+  SALADO
+  FRESCO
+  CORTADO
+}
+
+/// Destino del cuero: CURTIEMBRE o VENTA_DIRECTA.
+enum TipoDestinoCuero {
+  CURTIEMBRE
+  VENTA_DIRECTA
+}
+
+/// Estados de cuero: PENDIENTE, DESPACHADO, ANULADO.
+enum EstadoCuero {
+  PENDIENTE
+  DESPACHADO
+  ANULADO
+}
+
+/// Tipos de grasa: RENDERING, GRASA_DRESSING, GRASA_COMESTIBLE.
+enum TipoGrasa {
+  RENDERING
+  GRASA_DRESSING
+  GRASA_COMESTIBLE
+}
+
+// ============================================================
+// SECCIÓN 11: SUBPRODUCTOS — RENDERING (GRASA, DESPERDICIOS)
+// ============================================================
+
+/// Registro de subproductos para rendering (grasa, desperdicios, fondo digestor, sangre).
+model RegistroRendering {
+  id String @id @default(cuid())
+
+  // Tipo: GRASA, DESPERDICIOS, FONDO_DIGESTOR, SANGRE
+  tipo TipoRendering @default(GRASA)
+
+  // Datos de faena
+  fechaFaena  DateTime?
+  tropaCodigo String?
+  pesoKg      Float
+
+  // Destino (cliente/rendering)
+  destino String?
+
+  // Estado
+  estado EstadoRendering @default(REGISTRADO)
+
+  // Despacho
+  remito        String?
+  fechaDespacho DateTime?
+
+  // Observaciones
+  observaciones String?
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([fechaFaena])
+  @@index([estado])
+}
+
+/// Precios de rendering por cliente y tipo de producto.
+model PrecioRendering {
+  id           String    @id @default(cuid())
+  clienteId    String
+  cliente      Cliente   @relation(fields: [clienteId], references: [id])
+  tipoProducto String
+  precioKg     Decimal @db.Decimal(12, 2)
+  fechaDesde   DateTime  @default(now())
+  fechaHasta   DateTime?
+  activo       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([clienteId])
+  @@index([tipoProducto])
+}
+
+/// Tipos de subproducto para rendering: GRASA, DESPERDICIOS, FONDO_DIGESTOR, SANGRE.
+enum TipoRendering {
+  GRASA
+  DESPERDICIOS
+  FONDO_DIGESTOR
+  SANGRE
+}
+
+/// Estados de rendering: REGISTRADO, DESPACHADO, ANULADO.
+enum EstadoRendering {
+  REGISTRADO
+  DESPACHADO
+  ANULADO
+}
+
+// ============================================================
+// SECCIÓN 12: INSUMOS Y BOM
+// ============================================================
+
+/// Catálogo de insumos (embalaje, etiquetas, higiene, protección, herramientas).
+model Insumo {
+  id     String @id @default(cuid())
+  codigo String @unique // Código interno
+  nombre String
+
+  // Categorización
+  categoria    CategoriaInsumoTipo
+  subcategoria String?
+
+  // Unidad de medida
+  unidadMedida String @default("UN") // UN, KG, L, M, ROLLO
+
+  // Stock
+  stockActual     Float  @default(0)
+  stockMinimo     Float  @default(0)
+  stockMaximo     Float?
+  puntoReposicion Float?
+
+  // Proveedor (denormalizado - nombre y código de texto para referenciar sin FK)
+  proveedorNombre String?
+  codigoProveedor String? // Código del proveedor
+
+  // Precios
+  precioUnitario Decimal? @db.Decimal(12, 2)
+  moneda         String @default("ARS")
+
+  // Ubicación
+  ubicacion String? // Depósito, estantería, etc.
+
+  // Control
+  activo        Boolean @default(true)
+  observaciones String?
+
+  // Relación con BOM (Ciclo II)
+  bomItems            C2BOM[]
+  stockInsumo         StockInsumo[]
+  movimientosInsumo   MovimientoInsumo[]
+  detallesInventario  DetalleInventario[]
+  consumosInsumo      ConsumoInsumo[]
+  detallesOrdenCompra DetalleOrdenCompra[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  historialPrecios HistorialPrecioInsumo[]
+
+  @@index([categoria])
+  @@index([activo])
+}
+
+/// Historial de cambios de precio de insumos con motivo y operador.
+model HistorialPrecioInsumo {
+  id             String  @id @default(cuid())
+  insumoId       String
+  insumo         Insumo  @relation(fields: [insumoId], references: [id])
+  precioAnterior Decimal? @db.Decimal(12, 2)
+  precioNuevo    Decimal? @db.Decimal(12, 2)
+  moneda         String  @default("ARS")
+  motivo         String? // "Actualización manual", "Ingreso compra", "Ajuste"
+  operadorId     String?
+  operador       Operador? @relation(fields: [operadorId], references: [id])
+  fecha          DateTime @default(now())
+
+  @@index([insumoId])
+  @@index([fecha])
+}
+
+/// Stock actual de insumos por depósito (cantidades, precios promedio).
+model StockInsumo {
+  id             String    @id @default(cuid())
+  insumoId       String
+  insumo         Insumo    @relation(fields: [insumoId], references: [id])
+  depositoId     String
+  deposito       Deposito  @relation(fields: [depositoId], references: [id])
+  cantidad       Float     @default(0)
+  cantidadMinima Float?
+  cantidadMaxima Float?
+  precioPromedio Decimal? @db.Decimal(12, 2)
+  valorTotal     Decimal? @db.Decimal(12, 2)
+  ultimoIngreso  DateTime?
+  ultimaSalida   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([insumoId, depositoId], name: "stockInsumo_insumo_deposito")
+  @@index([depositoId])
+}
+
+/// Movimientos de insumos (ingreso, egreso, transferencia, ajuste, pérdida).
+model MovimientoInsumo {
+  id                String               @id @default(cuid())
+  insumoId          String
+  insumo            Insumo               @relation(fields: [insumoId], references: [id])
+  tipo              TipoMovimientoInsumo
+  depositoOrigenId  String?
+  depositoOrigen    Deposito?            @relation("DepositoOrigenInsumo", fields: [depositoOrigenId], references: [id])
+  depositoDestinoId String?
+  depositoDestino   Deposito?            @relation("DepositoDestinoInsumo", fields: [depositoDestinoId], references: [id])
+  cantidad          Float
+  loteInsumoId      String?
+  precioUnitario    Decimal? @db.Decimal(12, 2)
+  costoTotal        Decimal? @db.Decimal(12, 2)
+  documentoTipo     String?
+  documentoNumero   String?
+  centroCostoId     String?
+  produccionId      String?
+  observaciones     String?
+  operadorId        String?
+  operador          Operador?            @relation(fields: [operadorId], references: [id])
+  fecha             DateTime             @default(now())
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([insumoId])
+  @@index([tipo])
+  @@index([fecha])
+}
+
+/// Categorías de insumos para clasificación.
+model CategoriaInsumo {
+  id          String   @id @default(cuid())
+  nombre      String
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Artículos generales del sistema con código y categoría.
+model Articulo {
+  id            String   @id @default(cuid())
+  codigo        String   @unique
+  nombre        String
+  categoria     String?
+  especie       String?
+  observaciones String?
+  activo        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// Órdenes de compra a proveedores con detalles, recepciones y estado.
+model OrdenCompra {
+  id             String            @id @default(cuid())
+  numero         Int
+  proveedorId    String?
+  proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
+  fechaEmision   DateTime          @default(now())
+  fechaEntrega   DateTime?
+  fechaRecepcion DateTime?
+  estado         EstadoOrdenCompra @default(PENDIENTE)
+  subtotal       Decimal             @default(0) @db.Decimal(12, 2)
+  iva            Decimal             @default(0) @db.Decimal(12, 2)
+  total          Decimal             @default(0) @db.Decimal(12, 2)
+  observaciones  String?
+  operadorId     String?
+  operador       Operador?         @relation(fields: [operadorId], references: [id])
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  detalles    DetalleOrdenCompra[]
+  recepciones RecepcionCompra[]
+
+  @@index([estado])
+  @@index([proveedorId])
+  @@index([fechaEmision])
+}
+
+/// Items de una orden de compra (insumo, cantidad pedida/recibida, centro de costo).
+model DetalleOrdenCompra {
+  id               String             @id @default(cuid())
+  ordenCompraId    String
+  ordenCompra      OrdenCompra        @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  insumoId         String
+  insumo           Insumo             @relation(fields: [insumoId], references: [id])
+  cantidadPedida   Float
+  cantidadRecibida Float              @default(0)
+  precioUnitario   Decimal @db.Decimal(12, 2)
+  subtotal         Decimal @db.Decimal(12, 2)
+  centroCostoId    String?
+  centroCosto      CentroCosto?       @relation(fields: [centroCostoId], references: [id])
+  estado           EstadoDetalleOrden @default(PENDIENTE)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([ordenCompraId])
+  @@index([insumoId])
+  @@index([centroCostoId])
+}
+
+/// Recepciones parciales o completas de órdenes de compra.
+model RecepcionCompra {
+  id             String          @id @default(cuid())
+  ordenCompraId  String
+  ordenCompra    OrdenCompra     @relation(fields: [ordenCompraId], references: [id])
+  numeroRemito   String?
+  fechaRecepcion DateTime        @default(now())
+  estado         EstadoRecepcion @default(PARCIAL)
+  observaciones  String?
+  operadorId     String?
+  operador       Operador?       @relation(fields: [operadorId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([ordenCompraId])
+  @@index([estado])
+}
+
+/// Inventarios de depósitos con conteo físico vs. sistema.
+model Inventario {
+  id                 String           @id @default(cuid())
+  numero             Int
+  depositoId         String
+  deposito           Deposito         @relation(fields: [depositoId], references: [id])
+  fechaInicio        DateTime         @default(now())
+  fechaFin           DateTime?
+  operadorId         String?
+  supervisorId       String?
+  estado             EstadoInventario @default(PENDIENTE)
+  observaciones      String?
+  itemsTotal         Int              @default(0)
+  itemsConDiferencia Int              @default(0)
+  valorDiferencia    Decimal? @db.Decimal(12, 2)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  detalles DetalleInventario[]
+
+  @@index([depositoId])
+  @@index([estado])
+}
+
+/// Detalle de inventario por insumo (cantidades sistema, física, diferencia).
+model DetalleInventario {
+  id              String     @id @default(cuid())
+  inventarioId    String
+  inventario      Inventario @relation(fields: [inventarioId], references: [id], onDelete: Cascade)
+  insumoId        String
+  insumo          Insumo     @relation(fields: [insumoId], references: [id])
+  cantidadSistema Float      @default(0)
+  cantidadFisica  Float      @default(0)
+  diferencia      Float      @default(0)
+  costoUnitario   Decimal? @db.Decimal(12, 2)
+  costoDiferencia Decimal? @db.Decimal(12, 2)
+  estado          String?
+  observaciones   String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@unique([inventarioId, insumoId], name: "detalleInventario_insumo_deposito")
+  @@index([inventarioId])
+}
+
+/// Centros de costo con presupuestos mensuales y balances de insumos.
+model CentroCosto {
+  id                 String   @id @default(cuid())
+  codigo             String   @unique
+  nombre             String
+  descripcion        String?
+  tipo               String
+  responsable        String?
+  presupuestoMensual Decimal? @db.Decimal(12, 2)
+  activo             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  presupuestos        PresupuestoCentro[]
+  consumosCentro      ConsumoCentro[]
+  consumosInsumo      ConsumoInsumo[]
+  detallesOrdenCompra DetalleOrdenCompra[]
+
+  balancesInsumos BalanceInsumos[]
+
+  @@index([activo])
+}
+
+/// Registros de consumo genérico por centro de costo.
+model ConsumoCentro {
+  id            String      @id @default(cuid())
+  centroCostoId String
+  centroCosto   CentroCosto @relation(fields: [centroCostoId], references: [id])
+  fecha         DateTime    @default(now())
+  concepto      String
+  categoria     String?
+  cantidad      Float?
+  monto         Decimal @db.Decimal(12, 2)
+  observaciones String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([centroCostoId])
+  @@index([fecha])
+}
+
+/// Consumo de insumos por centro de costo y/o tropa (costo real vs. estándar).
+model ConsumoInsumo {
+  id                String       @id @default(cuid())
+  insumoId          String
+  insumo            Insumo       @relation(fields: [insumoId], references: [id])
+  centroCostoId     String?
+  centroCosto       CentroCosto? @relation(fields: [centroCostoId], references: [id])
+  cantidad          Float
+  costoUnitario     Decimal? @db.Decimal(12, 2)
+  costoTotal        Decimal? @db.Decimal(12, 2)
+  tropaId           String?
+  produccionFecha   DateTime?
+  cantidadProducida Float?
+  consumoEstandar   Float?
+  desviacion        Float?
+  observaciones     String?
+  fecha             DateTime     @default(now())
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([insumoId])
+  @@index([centroCostoId])
+  @@index([tropaId])
+  @@index([fecha])
+}
+
+/// Presupuestos mensuales por centro de costo con ejecución y desviación.
+model PresupuestoCentro {
+  id            String      @id @default(cuid())
+  centroCostoId String
+  centroCosto   CentroCosto @relation(fields: [centroCostoId], references: [id])
+  anio          Int
+  mes           Int
+  presupuesto   Decimal       @default(0) @db.Decimal(12, 2)
+  ejecutado     Decimal       @default(0) @db.Decimal(12, 2)
+  desviacion    Decimal? @db.Decimal(12, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([centroCostoId, anio, mes])
+}
+
+/// Balance periódico de insumos: consumo total, kg producidos, costo por kg/cabeza.
+model BalanceInsumos {
+  id              String       @id @default(cuid())
+  fechaDesde      DateTime
+  fechaHasta      DateTime
+  centroCostoId   String?
+  centroCosto     CentroCosto? @relation(fields: [centroCostoId], references: [id])
+  consumoTotal    Decimal        @default(0) @db.Decimal(12, 2)
+  kgProducidos    Float        @default(0)
+  cabezasFaenadas Int          @default(0)
+  costoPorKg      Decimal? @db.Decimal(12, 2)
+  costoPorCabeza  Decimal? @db.Decimal(12, 2)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([centroCostoId])
+}
+
+/// Categorías de insumos: EMBALAJE, ETIQUETAS, HIGIENE, PROTECCION, HERRAMIENTAS, OFICINA, OTROS.
+enum CategoriaInsumoTipo {
+  EMBALAJE // Bolsas, films, cajas
+  ETIQUETAS // Rótulos, etiquetas
+  HIGIENE // Productos de limpieza
+  PROTECCION // EPP, guantes, delantales
+  HERRAMIENTAS // Cuchillos, ganchos
+  OFICINA // Papel, insumos de oficina
+  OTROS
+}
+
+/// Tipos de movimiento de insumo: INGRESO, EGRESO, TRANSFERENCIA, AJUSTE_POSITIVO/NEGATIVO, PERDIDA, DEVOLUCION.
+enum TipoMovimientoInsumo {
+  INGRESO
+  EGRESO
+  TRANSFERENCIA
+  AJUSTE_POSITIVO
+  AJUSTE_NEGATIVO
+  PERDIDA
+  DEVOLUCION
+}
+
+/// Estados de orden de compra: PENDIENTE, APROBADA, ENVIADA, PARCIAL, COMPLETADA, ANULADA.
+enum EstadoOrdenCompra {
+  PENDIENTE
+  APROBADA
+  ENVIADA
+  PARCIAL
+  COMPLETADA
+  ANULADA
+}
+
+/// Estados de detalle de orden de compra: PENDIENTE, PARCIAL, COMPLETADO.
+enum EstadoDetalleOrden {
+  PENDIENTE
+  PARCIAL
+  COMPLETADO
+}
+
+/// Estados de recepción de compra: PARCIAL, COMPLETA.
+enum EstadoRecepcion {
+  PARCIAL
+  COMPLETA
+}
+
+/// Estados de inventario: PENDIENTE, EN_PROCESO, COMPLETADO, ANULADO.
+enum EstadoInventario {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADO
+  ANULADO
+}
+
+// ============================================================
+// SECCIÓN 13: FACTURACIÓN Y FINANZAS
+// ============================================================
+
+/// Facturas de venta (servicio de faena, productos) con AFIP CAE, saldo y pagos.
+model Factura {
+  id            String @id @default(cuid())
+  numero        String @unique // N° de factura (ej: 0001-00001234)
+  numeroInterno Int // Número secuencial interno
+
+  // Tipo de comprobante
+  tipoComprobante TipoComprobante @default(FACTURA_B) // A, B, C según condición IVA cliente
+
+  // Cliente
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
+  // Datos del cliente al momento de facturar (snapshot)
+  clienteNombre       String? // Razón social
+  clienteCuit         String? // CUIT
+  clienteCondicionIva CondicionIva? // RI, CF, MT, EX
+  clienteDireccion    String?
+
+  // Fechas
+  fecha            DateTime  @default(now())
+  fechaEmision     DateTime? // Cuando se emitió
+  fechaVencimiento DateTime? // Vencimiento para pago
+
+  // Totales
+  subtotal        Decimal @default(0) @db.Decimal(12, 2)
+  iva             Decimal @default(0) @db.Decimal(12, 2)
+  porcentajeIva   Float @default(10.5) // 10.5 o 21 según producto/servicio
+  total           Decimal @default(0) @db.Decimal(12, 2)
+  importeTributos Decimal @default(0) @db.Decimal(12, 2)
+
+  // Estado y saldo
+  estado EstadoFactura @default(PENDIENTE)
+  saldo  Decimal         @default(0) @db.Decimal(12, 2) // Saldo pendiente de pago
+
+  // Condición de venta
+  condicionVenta String? @default("CUENTA_CORRIENTE") // CONTADO, CUENTA_CORRIENTE
+
+  // Despacho relacionado (si aplica)
+  despachoId String?
+  despacho   Despacho? @relation(fields: [despachoId], references: [id])
+
+  // Observaciones
+  observaciones String?
+
+  // Remito asociado
+  remito         String?
+  cae            String?
+  caeVencimiento DateTime?
+  puntoVenta     Int       @default(1)
+  numeroAfip     Int?
+
+  // Datos AFIP (factura electrónica)
+  numeroComprobante   String?
+  fechaVencimientoCAE DateTime?
+  fechaEmisionAFIP    DateTime?
+  qrData              String?
+  saldoPendiente      Decimal? @db.Decimal(12, 2)
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  detalles     DetalleFactura[]
+  pagos        PagoFactura[]
+  tributos     FacturaTributo[]
+  notas        NotaCreditoDebito[]
+  notasCredito NotaCredito[]
+  notasDebito  NotaDebito[]
+
+  liquidacion   LiquidacionFaena?
+  balancesFaena BalanceFaena[]
+
+  @@index([numero])
+  @@index([clienteId])
+  @@index([estado])
+  @@index([fecha])
+  @@index([tipoComprobante])
+}
+
+/// Líneas de detalle de factura (servicio/producto, cantidad, precio, trazabilidad).
+model DetalleFactura {
+  id        String  @id @default(cuid())
+  facturaId String
+  factura   Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+
+  // Servicio facturado
+  tipoServicioId String?
+  tipoServicio   TipoServicio? @relation(fields: [tipoServicioId], references: [id])
+
+  // Producto facturado
+  tipoProducto TipoProductoFactura // MEDIA_RES, CUARTO, MENUDENCIA, OTRO
+  descripcion  String // Descripción del producto
+
+  // Cantidad y precio
+  cantidad       Float  @default(1)
+  unidad         String @default("KG") // KG, UN
+  precioUnitario Decimal  @default(0) @db.Decimal(12, 2)
+  subtotal       Decimal  @default(0) @db.Decimal(12, 2)
+
+  // Trazabilidad (opcional)
+  tropaCodigo String? // Código de tropa
+  garron      Int? // Número de garrón
+  mediaResId  String? // ID de media res
+  despachoId  String? // ID del despacho relacionado
+
+  // Datos del animal/producto
+  pesoKg Float? // Peso en KG
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([facturaId])
+  @@index([tipoServicioId])
+  @@index([tipoProducto])
+  @@index([despachoId])
+}
+
+/// Tipos de servicios facturables (faena, embolsado, deshuesado, etc.).
+model TipoServicio {
+  id          String  @id @default(cuid())
+  codigo      String  @unique // FAENA, EMBOLSADO_VACIO, DESHUESADO, etc.
+  nombre      String // "Servicio de Faena x Kg"
+  descripcion String?
+
+  // Unidad de medida
+  unidad String @default("KG") // KG, UN, HORA
+
+  // Configuración
+  seFactura  Boolean @default(true) // Si se factura o está incluido en otro servicio
+  incluidoEn String? // Código del servicio que lo incluye (ej: "FAENA")
+
+  // IVA por defecto
+  porcentajeIva Float @default(21) // 10.5 o 21
+
+  // Orden de aparición
+  orden Int @default(0)
+
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  precios         PrecioServicio[]
+  detallesFactura DetalleFactura[]
+
+  @@index([activo])
+  @@index([orden])
+}
+
+/// Precios de servicios por cliente con vigencia (fecha desde/hasta).
+model PrecioServicio {
+  id String @id @default(cuid())
+
+  // Relaciones
+  tipoServicioId String
+  tipoServicio   TipoServicio @relation(fields: [tipoServicioId], references: [id])
+  clienteId      String
+  cliente        Cliente      @relation(fields: [clienteId], references: [id])
+
+  // Precio
+  precio Decimal // Precio por unidad
+
+  // Vigencia
+  fechaDesde DateTime  @default(now())
+  fechaHasta DateTime? // null = vigente actualmente
+
+  // Observaciones
+  observaciones String?
+
+  // Auditoría
+  createdBy String? // ID del operador que creó el precio
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relación con historial
+  historial PrecioHistorial[]
+
+  @@index([tipoServicioId])
+  @@index([clienteId])
+  @@index([fechaDesde])
+  @@index([fechaHasta])
+}
+
+/// Historial de cambios de precios de servicios (snapshots de cliente y servicio).
+model PrecioHistorial {
+  id String @id @default(cuid())
+
+  // Relación con el precio actual (opcional, null si el precio fue eliminado)
+  precioServicioId String?
+  precioServicio   PrecioServicio? @relation(fields: [precioServicioId], references: [id])
+
+  // Snapshot del tipo de servicio y cliente (por si se eliminan)
+  tipoServicioId     String
+  tipoServicioNombre String // Snapshot del nombre
+  clienteId          String
+  clienteNombre      String // Snapshot del nombre
+
+  // Cambio de precio
+  precioAnterior Decimal? // null si es creación
+  precioNuevo    Decimal // Precio establecido
+
+  // Vigencia
+  fechaDesde DateTime // Desde cuándo rige
+  fechaHasta DateTime? // Hasta cuándo rigió (null = vigente)
+
+  // Motivo del cambio
+  motivo String? // "Ajuste trimestral", "Nuevo contrato", etc.
+
+  // Auditoría
+  operadorId     String? // Quién hizo el cambio
+  operadorNombre String? // Snapshot del nombre
+  tipoCambio     String  @default("CREACION") // CREACION, ACTUALIZACION, ELIMINACION
+
+  createdAt DateTime @default(now())
+
+  @@index([precioServicioId])
+  @@index([tipoServicioId])
+  @@index([clienteId])
+  @@index([fechaDesde])
+  @@index([operadorId])
+  @@index([tipoCambio])
+}
+
+/// Pagos parciales aplicados a facturas (efectivo, transferencia, cheque).
+model PagoFactura {
+  id String @id @default(cuid())
+
+  // Factura relacionada
+  facturaId String
+  factura   Factura @relation(fields: [facturaId], references: [id])
+
+  // Datos del pago
+  fecha DateTime @default(now())
+  monto Decimal // Monto pagado
+
+  // Método de pago
+  metodoPago String  @default("EFECTIVO") // EFECTIVO, TRANSFERENCIA, CHEQUE, TARJETA
+  referencia String? // N° de transferencia, cheque, etc.
+
+  // Información adicional
+  banco        String?
+  numeroCheque String?
+  fechaCheque  DateTime? // Para cheques diferidos
+
+  observaciones String?
+
+  // Operador que registró
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([facturaId])
+  @@index([fecha])
+  @@index([metodoPago])
+}
+
+/// Tributos de factura (percepciones IIBB, retenciones ganancias, etc.).
+model FacturaTributo {
+  id        String  @id @default(cuid())
+  facturaId String
+  factura   Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+
+  // Tipo de tributo (código AFIP)
+  tributoId   Int // 1=Nacional, 4=Percep.IIBB, 5=Percep.IVA, 6=Percep.Gan, 7=Otros
+  descripcion String // "Percepción IIBB CABA", "Retención Ganancias", etc.
+
+  // Cálculo
+  baseImponible Decimal @default(0) @db.Decimal(12, 2)
+  alicuota      Float @default(0) // Porcentaje
+  importe       Decimal @default(0) @db.Decimal(12, 2) // Monto calculado
+
+  createdAt DateTime @default(now())
+
+  @@index([facturaId])
+  @@index([tributoId])
+}
+
+/// Notas de crédito/débito genéricas vinculadas a facturas (con CAE AFIP).
+model NotaCreditoDebito {
+  id              String @id @default(cuid())
+  tipo            String // CREDITO, DEBITO
+  tipoComprobante Int // 02, 03, 07, 08, 12, 13 (AFIP codes)
+
+  // Referencia a factura original
+  facturaId String
+  factura   Factura @relation(fields: [facturaId], references: [id])
+
+  // Datos
+  numero     Int // Número secuencial
+  puntoVenta Int      @default(1)
+  fecha      DateTime @default(now())
+
+  // Motivo
+  motivo      String // DEVOLUCION, DESCUENTO, ERROR, ANULACION, AJUSTE
+  descripcion String?
+
+  // CAE (si aplica)
+  cae            String?
+  caeVencimiento DateTime?
+
+  // Totales
+  subtotal Decimal @default(0) @db.Decimal(12, 2)
+  iva      Decimal @default(0) @db.Decimal(12, 2)
+  total    Decimal @default(0) @db.Decimal(12, 2)
+
+  // Estado
+  estado String @default("EMITIDA") // EMITIDA, ANULADA
+
+  // Operador
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([facturaId])
+  @@index([tipo])
+  @@index([fecha])
+  @@index([estado])
+}
+
+/// Configuración original de integración AFIP (certificados, WSAA, WSFE).
+model ConfiguracionAFIP {
+  id String @id @default(cuid())
+
+  // Certificados
+  certificadoPath  String? // Ruta al certificado .crt
+  clavePrivadaPath String? // Ruta a la clave privada .key
+
+  // Entorno
+  entorno String @default("testing") // testing | production
+
+  // CUIT y razón social del emisor
+  cuit              String?
+  razonSocial       String?
+  inicioActividades DateTime?
+
+  // Puntos de venta habilitados
+  puntosVenta String? // JSON array: [1, 2, 3]
+
+  // Credenciales WSAA
+  wsaaUrl String? // URL del WSAA
+  wsfeUrl String? // URL del WSFEv1
+
+  // Último token obtenido (cache)
+  tokenWsfe       String?
+  signWsfe        String?
+  tokenExpiracion DateTime?
+
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Tipos de tarifa configurables (faena bovino/equino, estacionamiento, flete).
+model TipoTarifa {
+  id          String  @id @default(cuid())
+  codigo      String  @unique // FAENA_BOV, FAENA_EQU, ESTACIONAMIENTO, FLETE, etc.
+  descripcion String
+  unidad      String  @default("POR_KG") // POR_KG, POR_CABEZA, FIJO, POR_KG_POR_DIA
+  activo      Boolean @default(true)
+  orden       Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  historico HistoricoTarifa[]
+
+  @@index([activo])
+  @@index([orden])
+}
+
+/// Valores históricos de tarifas con segmentación por cliente, especie, categoría.
+model HistoricoTarifa {
+  id           String     @id @default(cuid())
+  tipoTarifaId String
+  tipoTarifa   TipoTarifa @relation(fields: [tipoTarifaId], references: [id])
+
+  // Segmentación (puede ser global, por especie, por usuario/cliente)
+  clienteId String? // null = tarifa general; con valor = tarifa especial del cliente
+  especie   String? // BOVINO, EQUINO, etc.; null = todas
+  categoria String? // NOVILLO, VACA, etc.; null = todas
+
+  // Precio y vigencia
+  valor         Decimal @db.Decimal(12, 2) // precio en pesos
+  moneda        String    @default("ARS")
+  vigenciaDesde DateTime // desde cuándo aplica
+  vigenciaHasta DateTime? // null = vigente actualmente
+
+  // Auditoría
+  operadorId String? // quién lo cargó
+  motivo     String? // "Actualización por inflación", "Acuerdo con cliente X", etc.
+
+  createdAt DateTime @default(now())
+
+  cliente  Cliente?  @relation(fields: [clienteId], references: [id])
+  operador Operador? @relation(fields: [operadorId], references: [id])
+
+  @@index([tipoTarifaId, vigenciaDesde])
+  @@index([clienteId, tipoTarifaId])
+  @@index([especie])
+  @@index([vigenciaHasta])
+}
+
+/// Liquidación de servicio de faena por tropa (tarifa, IVA, retenciones, factura).
+model LiquidacionFaena {
+  id     String @id @default(cuid())
+  numero Int    @unique
+
+  // Vínculos con el ciclo productivo
+  tropaId   String  @unique
+  tropa     Tropa   @relation(fields: [tropaId], references: [id])
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
+  // Datos de la faena (solo lectura desde romaneo)
+  fechaFaena  DateTime
+  dteSenasa   String?
+  certFaena   String?
+  cantCabezas Int
+  kgRomaneo   Float // SOLO LECTURA — tomado del romaneo cerrado
+
+  // Tarifa aplicada (congelada)
+  tarifaFaenaId    String? // referencia al HistoricoTarifa usado
+  tarifaFaenaValor Decimal @db.Decimal(12, 2) // valor copiado (no depender del histórico para recalcular)
+
+  // Conceptos adicionales
+  items LiquidacionItem[]
+
+  // Totales calculados
+  subtotalNeto     Decimal @default(0) @db.Decimal(12, 2)
+  totalIVA         Decimal @default(0) @db.Decimal(12, 2)
+  totalRetenciones Decimal @default(0) @db.Decimal(12, 2)
+  totalFinal       Decimal @default(0) @db.Decimal(12, 2)
+
+  // Estado
+  estado String @default("BORRADOR") // BORRADOR, EMITIDA, ANULADA
+
+  // Comprobante generado
+  facturaId String?  @unique
+  factura   Factura? @relation(fields: [facturaId], references: [id])
+
+  // Supervisor que aprobó edición
+  supervisorId String?
+  supervisor   Operador? @relation("LiquidacionSupervisor", fields: [supervisorId], references: [id])
+
+  operadorId String?
+  operador   Operador? @relation("LiquidacionOperador", fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tropaId])
+  @@index([clienteId])
+  @@index([estado])
+  @@index([fechaFaena])
+}
+
+/// Líneas de liquidación (conceptos, tarifas, cantidades, IVA).
+model LiquidacionItem {
+  id            String           @id @default(cuid())
+  liquidacionId String
+  liquidacion   LiquidacionFaena @relation(fields: [liquidacionId], references: [id], onDelete: Cascade)
+
+  tipoTarifaId String?
+  descripcion  String
+  unidad       String  @default("POR_KG") // POR_KG, POR_CABEZA, FIJO
+  cantidad     Float   @default(0) // kg, cabezas, o 1 si es fijo
+  tarifaValor  Decimal   @default(0) @db.Decimal(12, 2) // valor congelado
+  subtotal     Decimal   @default(0) @db.Decimal(12, 2)
+  alicuotaIVA  Float   @default(21) // 0, 10.5, 21
+  importeIVA   Decimal   @default(0) @db.Decimal(12, 2)
+
+  esDescuento Boolean @default(false) // para cueros/menudencias cedidos como pago parcial
+
+  createdAt DateTime @default(now())
+
+  @@index([liquidacionId])
+  @@index([tipoTarifaId])
+}
+
+/// Monedas configuradas (ARS, USD, EUR) con cotizaciones.
+model Moneda {
+  id        String   @id @default(cuid())
+  codigo    String   @unique
+  nombre    String
+  simbolo   String
+  esDefault Boolean  @default(false)
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cotizaciones Cotizacion[]
+}
+
+/// Cotizaciones de monedas (compra/venta) por fecha y fuente.
+model Cotizacion {
+  id       String   @id @default(cuid())
+  monedaId String
+  moneda   Moneda   @relation(fields: [monedaId], references: [id])
+  compra   Decimal @db.Decimal(12, 2)
+  venta    Decimal @db.Decimal(12, 2)
+  fuente   String   @default("MANUAL")
+  fecha    DateTime @default(now())
+
+  @@index([monedaId])
+}
+
+/// Formas de pago configuradas (efectivo, transferencia, cheque, tarjeta).
+model FormaPago {
+  id              String   @id @default(cuid())
+  nombre          String   @unique
+  descripcion     String?
+  tipo            String
+  requiereBanco   Boolean  @default(false)
+  requiereCheque  Boolean  @default(false)
+  requiereTarjeta Boolean  @default(false)
+  cuentaContable  String?
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  pagos Pago[]
+}
+
+/// Cuentas bancarias con saldo actual, conciliado y cheques asociados.
+model CuentaBancaria {
+  id              String   @id @default(cuid())
+  banco           String
+  tipoCuenta      String
+  numeroCuenta    String
+  cbu             String?  @unique
+  alias           String?
+  saldoActual     Decimal    @default(0) @db.Decimal(12, 2)
+  saldoConciliado Decimal    @default(0) @db.Decimal(12, 2)
+  titular         String?
+  cuitTitular     String?
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  cheques        Cheque[]
+  conciliaciones ConciliacionBancaria[]
+  cajas          Caja[]
+}
+
+/// Cheques recibidos con fechas, estados (recibido, depositado, cobrado, anulado).
+model Cheque {
+  id               String          @id @default(cuid())
+  numero           String
+  banco            String
+  monto            Decimal @db.Decimal(12, 2)
+  fechaEmision     DateTime        @default(now())
+  fechaVencimiento DateTime
+  fechaCobro       DateTime?
+  cuentaBancariaId String?
+  cuentaBancaria   CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+  libradorNombre   String
+  libradorCuit     String?
+  libradorTelefono String?
+  estado           EstadoCheque    @default(RECIBIDO)
+  destino          String?
+  observaciones    String?
+  createdAt        DateTime        @default(now())
+
+  pagos Pago[]
+
+  @@unique([numero, banco], name: "cheque_numero_banco")
+}
+
+/// Cajas (fondos) del sistema con saldo y movimientos.
+model Caja {
+  id               String          @id @default(cuid())
+  nombre           String
+  tipo             String
+  saldoActual      Decimal           @default(0) @db.Decimal(12, 2)
+  cuentaBancariaId String?
+  cuentaBancaria   CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+  activo           Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  movimientos MovimientoCaja[]
+  arqueos     ArqueoCaja[]
+}
+
+/// Movimientos de caja (ingresos, egresos, documentos de referencia).
+model MovimientoCaja {
+  id              String    @id @default(cuid())
+  cajaId          String
+  caja            Caja      @relation(fields: [cajaId], references: [id])
+  tipo            String
+  monto           Decimal @db.Decimal(12, 2)
+  saldoAnterior   Decimal @db.Decimal(12, 2)
+  saldoNueva      Decimal @db.Decimal(12, 2)
+  documentoTipo   String?
+  documentoId     String?
+  documentoNumero String?
+  concepto        String
+  observaciones   String?
+  terceroNombre   String?
+  terceroCuit     String?
+  operadorId      String?
+  operador        Operador? @relation(fields: [operadorId], references: [id])
+  fecha           DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  detallesConciliacion DetalleConciliacion[]
+
+  @@index([cajaId])
+  @@index([tipo])
+  @@index([fecha])
+  @@index([documentoId])
+}
+
+/// Arqueos de caja (conteo físico vs. sistema) con supervisor.
+model ArqueoCaja {
+  id            String    @id @default(cuid())
+  cajaId        String
+  caja          Caja      @relation(fields: [cajaId], references: [id])
+  fecha         DateTime  @default(now())
+  saldoSistema  Decimal @db.Decimal(12, 2)
+  saldoFisico   Decimal @db.Decimal(12, 2)
+  diferencia    Decimal @db.Decimal(12, 2)
+  estado        String    @default("PENDIENTE")
+  observaciones String?
+  operadorId    String?
+  operador      Operador? @relation(fields: [operadorId], references: [id], name: "ArqueoCajaOperador")
+  supervisorId  String?
+  supervisor    Operador? @relation(fields: [supervisorId], references: [id], name: "ArqueoCajaSupervisor")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([cajaId])
+  @@index([estado])
+  @@index([fecha])
+}
+
+/// Productos vendibles con precios multi-moneda, tipificación y datos de etiqueta.
+model ProductoVendible {
+  id                    String   @id @default(cuid())
+  codigo                String   @unique
+  nombre                String
+  descripcion           String?
+  tara                  Float    @default(0)
+  vencimientoDias       Int      @default(0)
+  numeroRegistroSenasa  String?
+  unidadMedida          String   @default("KG")
+  cantidadEtiquetas     Int      @default(1)
+  tieneTipificacion     Boolean  @default(false)
+  tipificacion          String?
+  categoria             String?
+  subcategoria          String?
+  especie               String?
+  tipo                  String?
+  delCuarto             String?
+  tipoVenta             String   @default("POR_KG")
+  descripcionCircular   String?
+  precioBase            Decimal? @db.Decimal(12, 2)
+  precioDolar           Decimal    @default(0) @db.Decimal(12, 2)
+  precioEuro            Decimal    @default(0) @db.Decimal(12, 2)
+  precioArs             Decimal    @default(0) @db.Decimal(12, 2)
+  moneda                String   @default("ARS")
+  alicuotaIva           Float    @default(21)
+  producidoParaCliente  String?
+  productoGeneral       Boolean  @default(false)
+  productoReporteRinde  Boolean  @default(false)
+  tipoTrabajo           String?
+  idiomaEtiqueta        String   @default("ES")
+  formatoEtiqueta       String?
+  textoEtiqueta         String?
+  textoEspanol          String?
+  textoIngles           String?
+  textoTercerIdioma     String?
+  temperaturaTransporte String?
+  tipoConsumo           String?
+  empresa               String?
+  tipoTrabajoId         String?
+  tipoCarne             String?
+  activo                Boolean  @default(true)
+  requiereTrazabilidad  Boolean  @default(false)
+  precioActual          Decimal    @default(0) @db.Decimal(12, 2)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  preciosHistorico HistoricoPrecioProducto[]
+  historicosPrecio HistoricoPrecio[]
+  preciosCliente   PrecioCliente[]
+
+  @@index([categoria])
+  @@index([activo])
+}
+
+/// Historial de precios de productos vendibles con motivo de cambio.
+model HistoricoPrecioProducto {
+  id                 String           @id @default(cuid())
+  productoVendibleId String
+  productoVendible   ProductoVendible @relation(fields: [productoVendibleId], references: [id])
+  precioAnterior     Decimal? @db.Decimal(12, 2)
+  precioNuevo        Decimal @db.Decimal(12, 2)
+  moneda             String           @default("ARS")
+  motivo             String?
+  fechaVigencia      DateTime         @default(now())
+  clienteId          String?
+  cliente            Cliente?         @relation(fields: [clienteId], references: [id])
+  operadorId         String?
+  operador           Operador?        @relation(fields: [operadorId], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([productoVendibleId, fechaVigencia(sort: Desc)])
+  @@index([clienteId])
+}
+
+/// Precios especiales por cliente y producto vendible.
+model PrecioCliente {
+  id                 String           @id @default(cuid())
+  clienteId          String
+  cliente            Cliente          @relation(fields: [clienteId], references: [id])
+  productoVendibleId String
+  productoVendible   ProductoVendible @relation(fields: [productoVendibleId], references: [id])
+  precioEspecial     Decimal @db.Decimal(12, 2)
+  moneda             String           @default("ARS")
+  fechaDesde         DateTime?
+  fechaHasta         DateTime?
+  activo             Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([clienteId, productoVendibleId])
+}
+
+/// Historial general de precios de productos (sin cliente específico).
+model HistoricoPrecio {
+  id                 String            @id @default(cuid())
+  productoVendibleId String?
+  productoVendible   ProductoVendible? @relation(fields: [productoVendibleId], references: [id])
+  precioAnterior     Decimal? @db.Decimal(12, 2)
+  precioNuevo        Decimal @db.Decimal(12, 2)
+  moneda             String            @default("ARS")
+  fechaVigencia      DateTime          @default(now())
+  motivo             String?
+  operadorId         String?
+  operador           Operador?         @relation(fields: [operadorId], references: [id])
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([productoVendibleId])
+}
+
+/// Pagos generales a terceros (con forma de pago, cheque, estado).
+model Pago {
+  id            String     @id @default(cuid())
+  numero        Int
+  terceroId     String?
+  terceroNombre String
+  terceroCuit   String?
+  terceroTipo   String
+  formaPagoId   String?
+  formaPago     FormaPago? @relation(fields: [formaPagoId], references: [id])
+  monto         Decimal @db.Decimal(12, 2)
+  chequeId      String?
+  cheque        Cheque?    @relation(fields: [chequeId], references: [id])
+  fecha         DateTime   @default(now())
+  estado        EstadoPago @default(PENDIENTE)
+  comprobante   String?
+  observaciones String?
+  operadorId    String?
+  operador      Operador?  @relation(fields: [operadorId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([terceroId])
+  @@index([fecha])
+  @@index([estado])
+}
+
+/// Notas de crédito emitidas a clientes (motivo, factura origen, totales).
+model NotaCredito {
+  id            String     @id @default(cuid())
+  numero        String
+  numeroInterno Int
+  clienteId     String
+  cliente       Cliente    @relation(fields: [clienteId], references: [id])
+  facturaId     String?
+  factura       Factura?   @relation(fields: [facturaId], references: [id])
+  fecha         DateTime   @default(now())
+  subtotal      Decimal      @default(0) @db.Decimal(12, 2)
+  iva           Decimal      @default(0) @db.Decimal(12, 2)
+  total         Decimal      @default(0) @db.Decimal(12, 2)
+  motivo        String
+  estado        EstadoNota @default(EMITIDA)
+  observaciones String?
+  operadorId    String?
+  operador      Operador?  @relation(fields: [operadorId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  detalles DetalleNotaCredito[]
+
+  @@index([clienteId])
+  @@index([fecha])
+  @@index([estado])
+}
+
+/// Notas de débito emitidas a clientes.
+model NotaDebito {
+  id            String     @id @default(cuid())
+  numero        String
+  numeroInterno Int
+  clienteId     String
+  cliente       Cliente    @relation(fields: [clienteId], references: [id])
+  facturaId     String?
+  factura       Factura?   @relation(fields: [facturaId], references: [id])
+  fecha         DateTime   @default(now())
+  subtotal      Decimal      @default(0) @db.Decimal(12, 2)
+  iva           Decimal      @default(0) @db.Decimal(12, 2)
+  total         Decimal      @default(0) @db.Decimal(12, 2)
+  motivo        String
+  estado        EstadoNota @default(EMITIDA)
+  observaciones String?
+  operadorId    String?
+  operador      Operador?  @relation(fields: [operadorId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  detalles DetalleNotaDebito[]
+
+  @@index([clienteId])
+  @@index([fecha])
+  @@index([estado])
+}
+
+/// Líneas de detalle de una nota de crédito.
+model DetalleNotaCredito {
+  id             String      @id @default(cuid())
+  notaCreditoId  String
+  notaCredito    NotaCredito @relation(fields: [notaCreditoId], references: [id], onDelete: Cascade)
+  descripcion    String
+  cantidad       Float       @default(1)
+  precioUnitario Decimal       @default(0) @db.Decimal(12, 2)
+  subtotal       Decimal @db.Decimal(12, 2)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+/// Líneas de detalle de una nota de débito.
+model DetalleNotaDebito {
+  id             String     @id @default(cuid())
+  notaDebitoId   String
+  notaDebito     NotaDebito @relation(fields: [notaDebitoId], references: [id], onDelete: Cascade)
+  descripcion    String
+  cantidad       Float      @default(1)
+  precioUnitario Decimal      @default(0) @db.Decimal(12, 2)
+  subtotal       Decimal @db.Decimal(12, 2)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+/// Conciliaciones bancarias con extractos importados y matching automático.
+model ConciliacionBancaria {
+  id               String         @id @default(cuid())
+  cuentaBancariaId String
+  cuentaBancaria   CuentaBancaria @relation(fields: [cuentaBancariaId], references: [id])
+  fechaDesde       DateTime
+  fechaHasta       DateTime
+  nombreArchivo    String
+  totalRegistros   Int            @default(0)
+  totalDebitos     Decimal          @default(0) @db.Decimal(12, 2)
+  totalCreditos    Decimal          @default(0) @db.Decimal(12, 2)
+  conciliados      Int            @default(0)
+  pendientes       Int            @default(0)
+  diferencias      Int            @default(0)
+  estado           String         @default("PENDIENTE")
+  creadoPor        String?
+  fecha            DateTime       @default(now())
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  detalles DetalleConciliacion[]
+
+  @@index([cuentaBancariaId])
+  @@index([estado])
+}
+
+/// Detalles de conciliación bancaria (movimientos cotejados con extracto).
+model DetalleConciliacion {
+  id                  String               @id @default(cuid())
+  conciliacionId      String
+  conciliacion        ConciliacionBancaria @relation(fields: [conciliacionId], references: [id], onDelete: Cascade)
+  movimientoCajaId    String?
+  movimientoCaja      MovimientoCaja?      @relation(fields: [movimientoCajaId], references: [id])
+  fechaExtracto       DateTime
+  descripcionExtracto String
+  referenciaExtracto  String?
+  montoExtracto       Decimal @db.Decimal(12, 2)
+  tipoExtracto        String
+  estado              String               @default("PENDIENTE")
+  confianza           Float? // Score de confianza del matching
+  montoAjuste         Decimal? @db.Decimal(12, 2)
+  observaciones       String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([conciliacionId])
+  @@index([estado])
+}
+
+/// Configuración simplificada de AFIP (punto de venta, ambiente, certificados).
+model AFIPConfig {
+  id                String    @id @default(cuid())
+  puntoVenta        Int       @default(1)
+  ambiente          String    @default("testing")
+  habilitado        Boolean   @default(false)
+  cuit              String?
+  razonSocial       String?
+  domicilio         String?
+  inicioActividades String?
+  certificado       String?
+  clavePrivada      String?
+  clave             String?
+  certificadoPath   String?
+  clavePrivadaPath  String?
+  fechaVencimiento  DateTime?
+  ultimoToken       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+/// Plan de cuentas contable jerárquico (activo, pasivo, patrimonio, ingreso, egreso).
+model PlanCuenta {
+  id          String         @id @default(cuid())
+  codigo      String         @unique // Código jerárquico: "1", "1.1", "1.1.01"
+  nombre      String
+  descripcion String?
+  tipo        TipoPlanCuenta // ACTIVO, PASIVO, PATRIMONIO, INGRESO, EGRESO
+  imputable   Boolean        @default(true) // Si admite movimientos (hojas del árbol)
+
+  // Jerarquía (self-relation)
+  padreId String?
+  padre   PlanCuenta?  @relation("PlanCuentaJerarquia", fields: [padreId], references: [id])
+  hijos   PlanCuenta[] @relation("PlanCuentaJerarquia")
+  nivel   Int          @default(0) // Nivel en el árbol (0 = raíz)
+
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  lineasAsiento AsientoContableLinea[]
+
+  @@index([codigo])
+  @@index([tipo])
+  @@index([activo])
+  @@index([padreId])
+}
+
+/// Asientos contables (ingresos, egresos, ajustes, apertura, cierre).
+model AsientoContable {
+  id         String                @id @default(cuid())
+  numero     String                @unique // N° correlativo del asiento
+  fecha      DateTime              @default(now())
+  concepto   String                @default("") // Descripción / glosa del asiento
+  tipoOrigen TipoAsientoContable   @default(AJUSTE) // INGRESO, EGRESO, AJUSTE, APERTURA, CIERRE
+  estado     EstadoAsientoContable @default(BORRADOR) // BORRADOR, CONFIRMADO, ANULADO
+
+  // Trazabilidad: qué originó este asiento
+  origenId      String? // ID de la entidad origen (Factura, Pago, etc.)
+  origenDetalle String? // Descripción del origen
+
+  // Operador que creó el asiento
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  lineas AsientoContableLinea[]
+
+  @@index([fecha])
+  @@index([estado])
+  @@index([tipoOrigen])
+  @@index([operadorId])
+}
+
+/// Líneas de asiento contable (cuenta, debe, haber, auxiliar).
+model AsientoContableLinea {
+  id        String          @id @default(cuid())
+  asientoId String
+  asiento   AsientoContable @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+
+  // Cuenta contable
+  cuentaId     String?
+  cuenta       PlanCuenta? @relation(fields: [cuentaId], references: [id])
+  codigoCuenta String // Código denormalizado de la cuenta
+  nombreCuenta String // Nombre denormalizado de la cuenta
+
+  // Valores contables
+  debe  Decimal @default(0) @db.Decimal(12, 2)
+  haber Decimal @default(0) @db.Decimal(12, 2)
+
+  // Auxiliar opcional (centro de costo, tercero, etc.)
+  auxiliarCodigo String?
+  auxiliarNombre String?
+
+  concepto String? // Concepto específico de la línea
+  orden    Int     @default(0) // Orden de la línea en el asiento
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([asientoId])
+  @@index([cuentaId])
+}
+
+/// Estados de factura: BORRADOR, PENDIENTE, EMITIDA, PAGADA, ANULADA.
+enum EstadoFactura {
+  BORRADOR // Capa 2: Factura en edición, auto-guardada
+  PENDIENTE // Creada pero no emitida
+  EMITIDA // Emitida al cliente
+  PAGADA // Pagada por el cliente
+  ANULADA // Anulada
+}
+
+/// Tipos de producto facturable: MEDIA_RES, CUARTO_DELANTERO, CUARTO_TRASERO, MENUDENCIA, OTRO.
+enum TipoProductoFactura {
+  MEDIA_RES // Media res completa
+  CUARTO_DELANTERO // Cuarto delantero
+  CUARTO_TRASERO // Cuarto trasero
+  MENUDENCIA // Menudencias
+  OTRO // Otros productos
+}
+
+/// Tipos de comprobante AFIP: FACTURA_A, FACTURA_B, FACTURA_C, REMITO, NOTA_CREDITO, NOTA_DEBITO.
+enum TipoComprobante {
+  FACTURA_A
+  FACTURA_B
+  FACTURA_C
+  REMITO
+  NOTA_CREDITO
+  NOTA_DEBITO
+}
+
+/// Condiciones de IVA: RI (Responsable Inscripto), CF, MT (Monotributista), EX, NC.
+enum CondicionIva {
+  RI // Responsable Inscripto
+  CF // Consumidor Final
+  MT // Monotributista
+  EX // Exento
+  NC // No Categorizado
+}
+
+/// Alícuotas de IVA: CERO (0%), DIEZ_CINCO (10.5% carnes), VEINTIUNO (21%), VEINTISIETE (27%).
+enum AlicuotaIVA {
+  CERO // 0% - Exento
+  DIEZ_CINCO // 10.5% - Carnes frescas
+  VEINTIUNO // 21% - Productos elaborados/servicios
+  VEINTISIETE // 27% - Servicios especiales
+}
+
+/// Estados de cheque: RECIBIDO, DEPOSITADO, COBRADO, ANULADO.
+enum EstadoCheque {
+  RECIBIDO
+  DEPOSITADO
+  COBRADO
+  ANULADO
+}
+
+/// Estados de pago: PENDIENTE, APLICADO, ANULADO.
+enum EstadoPago {
+  PENDIENTE
+  APLICADO
+  ANULADO
+}
+
+/// Estados de nota de crédito/débito: EMITIDA, APLICADA, ANULADA.
+enum EstadoNota {
+  EMITIDA
+  APLICADA
+  ANULADA
+}
+
+/// Tipos en plan de cuentas: ACTIVO, PASIVO, PATRIMONIO, INGRESO, EGRESO.
+enum TipoPlanCuenta {
+  ACTIVO
+  PASIVO
+  PATRIMONIO
+  INGRESO
+  EGRESO
+}
+
+/// Tipos de asiento contable: INGRESO, EGRESO, AJUSTE, APERTURA, CIERRE.
+enum TipoAsientoContable {
+  INGRESO
+  EGRESO
+  AJUSTE
+  APERTURA
+  CIERRE
+}
+
+/// Estados de asiento contable: BORRADOR, CONFIRMADO, ANULADO.
+enum EstadoAsientoContable {
+  BORRADOR
+  CONFIRMADO
+  ANULADO
+}
+
+// ============================================================
+// SECCIÓN 14: STOCKS Y ALERTAS
+// ============================================================
+
+/// Productos del catálogo con código EAN-128, conservación, tara y tipo de rótulo.
+model Producto {
+  id             String  @id @default(cuid())
+  codigo         String // Código de artículo (3 dígitos)
+  nombre         String
+  nombreReportes String?
+  especie        Especie
+
+  // Configuración del código EAN-128 (parte fija)
+  codigoTipificacion String? // 2 dígitos
+  codigoTipoTrabajo  String? // 1 dígito
+  codigoTransporte   String? // 1 dígito
+  codigoDestino      String? // 2 dígitos
+
+  // Datos del producto
+  tara                    Float?
+  diasConservacion        Int?
+  requiereTipificacion    Boolean     @default(false)
+  tipoRotulo              TipoRotulo?
+  precio                  Decimal? @db.Decimal(12, 2)
+  temperaturaConservacion String?
+
+  // Reportes
+  apareceRendimiento Boolean @default(false)
+  apareceStock       Boolean @default(false)
+
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cajas          CajaEmpaque[]
+  stockProductos StockProducto[]
+  stockCamara    StockCamara[]
+
+  @@unique([codigo, especie])
+  @@index([especie])
+}
+
+/// Tipos/clasificación de productos con jerarquía y especie.
+model TipoProducto {
+  id     String @id @default(cuid())
+  codigo String @unique
+  nombre String
+
+  // Categoría padre
+  categoriaPadreId String?
+  categoriaPadre   TipoProducto?  @relation("CategoriaProducto", fields: [categoriaPadreId], references: [id])
+  subcategorias    TipoProducto[] @relation("CategoriaProducto")
+
+  // Clasificación
+  especie Especie? // Si aplica a una especie específica
+  tipo    TipoProductoEnum
+
+  // Producción
+  requiereFrio     Boolean @default(true)
+  diasConservacion Int?
+  temperaturaMax   Float?
+
+  activo        Boolean @default(true)
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([activo])
+}
+
+/// Configuración de subproductos (menudencia, cuero, grasa, hueso, vísceras).
+model SubproductoConfig {
+  id        String @id @default(cuid())
+  codigo    String @unique
+  nombre    String
+  categoria String // MENUDENCIA, CUERO, GRASA, HUESO, VISCERAS, OTRO
+
+  // Clasificación
+  especie        String? // BOVINO, EQUINO, AMBOS
+  requiereFrio   Boolean @default(true)
+  temperaturaMax Float? // Temperatura máxima de almacenamiento
+
+  // Producción
+  unidadMedida   String @default("KG") // KG, UNIDAD, LITRO
+  rendimientoPct Float? // Rendimiento esperado % del peso vivo
+
+  // Trazabilidad
+  generaRotulo Boolean @default(false)
+  codigoRotulo String?
+
+  // Precio
+  precioReferencia Decimal? @db.Decimal(12, 2) // Precio por KG o unidad
+
+  activo        Boolean @default(true)
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoria])
+  @@index([activo])
+}
+
+/// Condiciones de embalaje (temperatura, humedad, tipo, conservación, transporte).
+model CondicionEmbalaje {
+  id     String @id @default(cuid())
+  codigo String @unique
+  nombre String
+
+  // Condiciones de almacenamiento
+  temperaturaMin Float? // °C mínima
+  temperaturaMax Float? // °C máxima
+  humedadMin     Float? // % humedad mínima
+  humedadMax     Float? // % humedad máxima
+
+  // Tipo de empaque
+  tipoEmpaque     String // CAJA, BOLSA, BULTO, CAJON
+  materialEmpaque String? // Cartón, plástico, etc.
+
+  // Conservación
+  requiereFrio      Boolean @default(true)
+  requiereCongelado Boolean @default(false)
+  diasValidez       Int? // Días de validez
+
+  // Transporte
+  requiereRefrigeracion Boolean @default(true)
+
+  activo        Boolean @default(true)
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([activo])
+}
+
+/// Stock de productos por cámara (cantidades y peso total, con producto de desposte).
+model StockProducto {
+  id String @id @default(cuid())
+
+  // Producto
+  productoNombre String
+  productoId     String?
+  producto       Producto? @relation(fields: [productoId], references: [id])
+
+  // Relación con producto de desposte (C2)
+  productoDesposteId String?
+  productoDesposte   C2ProductoDesposte? @relation(fields: [productoDesposteId], references: [id])
+
+  // Lote/Tropa
+  lote        String?
+  tropaCodigo String?
+
+  // Cámara
+  camaraId String?
+  camara   Camara? @relation(fields: [camaraId], references: [id])
+
+  // Cantidades
+  cantidad  Int   @default(0)
+  pesoTotal Float @default(0)
+
+  // Tipo y estado
+  tipo   String? // CORTE, MENUDENCIA, SUBPRODUCTO
+  estado String  @default("DISPONIBLE")
+
+  fechaIngreso DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([productoId])
+  @@index([camaraId])
+  @@index([estado])
+  @@index([tropaCodigo])
+}
+
+/// Stock de productos por cámara (cantidades y peso).
+model StockCamara {
+  id         String   @id @default(cuid())
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id])
+  camaraId   String
+  camara     Camara   @relation(fields: [camaraId], references: [id])
+  cantidad   Int?
+  pesoTotal  Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([productoId])
+  @@index([camaraId])
+}
+
+/// Alertas de stock (bajo, crítico, vencimiento) por entidad con resolución.
+model AlertaStock {
+  id          String   @id @default(cuid())
+  tipo        String   // STOCK_BAJO, STOCK_CRITICO, VENCIMIENTO_PROXIMO, VENCIMIENTO_VENCIDO
+  entidad     String   // PRODUCTO, MEDIA_RES, CAJA, INSUMO
+  entidadId   String?
+  entidadNombre String
+
+  // Valores
+  stockActual  Float
+  stockMinimo  Float?
+  stockDeseado Float?
+
+  // Ubicacion
+  camaraId     String?
+  camara       Camara?  @relation(fields: [camaraId], references: [id])
+
+  // Prioridad y estado
+  prioridad    String   @default("MEDIA") // BAJA, MEDIA, ALTA, CRITICA
+  estado       String   @default("ACTIVA") // ACTIVA, DESCARTADA, RESUELTA
+
+  // Resolucion
+  fechaResolucion DateTime?
+  resueltaPor    String?
+  operadorResolucion Operador? @relation("AlertasResueltas", fields: [resueltaPor], references: [id])
+
+  // Auditoria
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([prioridad])
+  @@index([estado])
+  @@index([entidad])
+  @@index([camaraId])
+}
+
+/// Clasificación de tipo de producto: CORTE_VACUNO, CORTE_EQUINO, MENUDENCIA, SUBPRODUCTO, DESPOSTADO, etc.
+enum TipoProductoEnum {
+  CORTE_VACUNO
+  CORTE_EQUINO
+  MENUDENCIA
+  SUBPRODUCTO
+  PRODUCTO_ELABORADO
+  DESPOSTADO
+  OTRO
+}
+
+// ============================================================
+// SECCIÓN 15: CALIDAD Y TRAZABILIDAD
+// ============================================================
+
+/// Tabla de códigos de especie (1=bovino, 2=equino, etc.) para trazabilidad.
+model CodigoEspecie {
+  id     String  @id @default(cuid())
+  codigo String  @unique // "1", "2", "6", etc.
+  nombre String // "equino", "bovino", etc.
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Tabla de códigos de transporte (0=barco enfriado, etc.) para rótulos.
+model CodigoTransporte {
+  id     String  @id @default(cuid())
+  codigo String  @unique // "0", "1", "2", etc.
+  nombre String // "BARCO enfriado", etc.
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Tabla de códigos de destino (.00, .01) para rótulos y exportación.
+model CodigoDestino {
+  id     String  @id @default(cuid())
+  codigo String  @unique // ".00", ".01", etc.
+  nombre String // "Italia", "Francia", etc.
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Tabla de códigos de tipo de trabajo para rótulos.
+model CodigoTipoTrabajo {
+  id     String  @id @default(cuid())
+  codigo String  @unique // "0", "1", "2", etc.
+  nombre String // "Ninguna", "descarte", etc.
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Tabla de códigos de tipificación (.00=todas, .01=M, .02=A) por especie.
+model CodigoTipificacion {
+  id      String  @id @default(cuid())
+  codigo  String  @unique // ".00", ".01", ".02", etc.
+  nombre  String // "todas", "M", "A", etc.
+  especie Especie // Para qué especie aplica
+  activo  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Mediciones de pH en medias reses con clasificación y datos de trazabilidad.
+model MedicionPH {
+  id String @id @default(cuid())
+
+  // Media res medida
+  mediaResId String
+  mediaRes   MediaRes @relation(fields: [mediaResId], references: [id], onDelete: Cascade)
+
+  // Datos de la medición
+  valorPH        Float               // Valor numérico del pH
+  clasificacion  ClasificacionPH      @default(SIN_CLASIFICAR)
+  temperatura    Float?               // Temperatura de la carne (°C) - opcional
+  horaMedicion   DateTime             // Fecha y hora de la medición (ingresada manualmente)
+  numeroMedicion Int                  @default(1) // 1 = primera, 2 = segunda (opcional), 3 = tercera (opcional)
+
+  // Operador que tomó la medición
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+  medidoPor  String? // Nombre del operador (denormalizado para reportes rápidos)
+
+  // Datos denormalizados para reportes (snapshot al momento de medir)
+  tropaCodigo   String? // Código de tropa
+  garron       Int?    // Número de garrón
+  tipoAnimal   String? // Tipo de animal (VA, NO, etc.)
+  raza         String? // Raza del animal
+  ladoMedia    String? // IZQUIERDA o DERECHA
+  productorNombre String? // Nombre del productor
+  productorId  String? // ID del productor
+  usuarioFaenaId String? // ID del usuario de faena (matarife)
+  usuarioFaenaNombre String? // Nombre del usuario de faena
+
+  // Observaciones
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([mediaResId])
+  @@index([tropaCodigo])
+  @@index([clasificacion])
+  @@index([horaMedicion])
+  @@index([productorId])
+  @@index([operadorId])
+  @@unique([mediaResId, numeroMedicion]) // Solo una medición N por media res
+}
+
+/// Umbrales de clasificación de pH (PSE, Normal, Intermedio, DFD).
+model ConfiguracionPH {
+  id String @id @default(cuid())
+
+  // Umbrales de clasificación
+  umbralPSE     Float @default(5.4)   // pH < este valor → ALTO (PSE)
+  umbralNormMax Float @default(5.7)   // pH <= este valor → NORMAL
+  umbralIntMax  Float @default(5.9)   // pH <= este valor → INTERMEDIO
+  // pH > umbralIntMax → DFD
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("configuracion_ph")
+}
+
+/// Reclamos y quejas de clientes con seguimiento, prioridad y resolución.
+model ReclamoCliente {
+  id String @id @default(cuid())
+
+  // Cliente relacionado (usuario de faena)
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
+  // Tipo de reclamo
+  tipo TipoReclamo
+
+  // Datos del reclamo
+  titulo      String
+  descripcion String? // Detalle del reclamo/queja
+
+  // Fecha del evento
+  fecha DateTime @default(now())
+
+  // Tropa/animal relacionado (opcional)
+  tropaCodigo String? // Si está relacionado con una tropa específica
+
+  // Responsable que registra
+  registradoPor String? // Nombre del operador que registra
+
+  // Estado
+  estado    EstadoReclamo    @default(PENDIENTE)
+  prioridad PrioridadReclamo @default(NORMAL)
+
+  // Respuesta/Resolución
+  respuesta      String? // Respuesta dada al cliente
+  fechaRespuesta DateTime? // Cuándo se respondió
+  respondidoPor  String? // Quién dio la respuesta
+
+  // Resolución
+  fechaResolucion DateTime? // Cuándo se resolvió definitivamente
+  resueltoPor     String? // Quién resolvió
+  resultado       String? // Resultado final (favorable, desestimado, etc.)
+
+  // Seguimiento
+  seguimiento String? // Notas internas de seguimiento
+
+  // Adjuntos (URLs)
+  adjuntoUrl String?
+
+  // Observaciones
+  observaciones String?
+
+  // Auditoría
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clienteId])
+  @@index([tipo])
+  @@index([estado])
+  @@index([fecha])
+  @@index([prioridad])
+}
+
+/// Catálogo de razas por especie (Angus, Hereford, etc.).
+model Raza {
+  id            String   @id @default(cuid())
+  nombre        String
+  especie       String
+  observaciones String?
+  activo        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// Usuarios del módulo de calidad (empleados con área, sector, puesto).
+model UsuarioCalidad {
+  id            String    @id @default(cuid())
+  nombre        String
+  apellido      String
+  dni           String?   @unique
+  cuit          String?
+  tipo          String    @default("EMPLEADO")
+  area          String?
+  sector        String?
+  puesto        String?
+  telefono      String?
+  email         String?
+  direccion     String?
+  fechaIngreso  DateTime  @default(now())
+  fechaEgreso   DateTime?
+  estado        String    @default("ACTIVO")
+  observaciones String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  novedades NovedadCalidad[]
+
+  @@index([estado])
+}
+
+/// Novedades de calidad (capacitaciones, hallazgos, auditorías) con seguimiento.
+model NovedadCalidad {
+  id                String         @id @default(cuid())
+  usuarioId         String
+  usuario           UsuarioCalidad @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo              String
+  titulo            String
+  descripcion       String?
+  fecha             DateTime       @default(now())
+  fechaVencimiento  DateTime?
+  responsableId     String?
+  responsableNombre String?
+  estado            String         @default("PENDIENTE")
+  acciones          String?
+  adjuntoUrl        String?
+  observaciones     String?
+  fechaResolucion   DateTime?
+  resueltoPor       String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([usuarioId])
+  @@index([estado])
+  @@index([fecha])
+}
+
+/// Clasificación de pH: NORMAL (5.4-5.7), INTERMEDIO (5.8-5.9), DFD (>=6.0), ALTO (<5.4), SIN_CLASIFICAR.
+enum ClasificacionPH {
+  NORMAL      // pH 5.4 - 5.7
+  INTERMEDIO  // pH 5.8 - 5.9
+  DFD         // pH >= 6.0 (Dark, Firm, Dry)
+  ALTO        // pH < 5.4 (PSE - Pale, Soft, Exudative)
+  SIN_CLASIFICAR
+}
+
+/// Tipos de reclamo: RECLAMO, QUEJA, INCIDENTE, CONSULTA, SUGERENCIA, OTRO.
+enum TipoReclamo {
+  RECLAMO // Reclamo formal
+  QUEJA // Queja sobre servicio
+  INCIDENTE // Incidente durante la faena
+  CONSULTA // Consulta o solicitud
+  SUGERENCIA // Sugerencia de mejora
+  OTRO // Otro tipo
+}
+
+/// Estados de reclamo: PENDIENTE → EN_REVISION → RESPONDIDO → RESUELTO/CERRADO/ANULADO.
+enum EstadoReclamo {
+  PENDIENTE // Pendiente de atención
+  EN_REVISION // En revisión/análisis
+  RESPONDIDO // Se dio respuesta al cliente
+  RESUELTO // Resuelto definitivamente
+  CERRADO // Cerrado sin resolución
+  ANULADO // Anulado
+}
+
+/// Prioridades de reclamo: BAJA, NORMAL, ALTA, URGENTE.
+enum PrioridadReclamo {
+  BAJA // No urgente
+  NORMAL // Prioridad normal
+  ALTA // Requiere atención pronta
+  URGENTE // Urgente, atención inmediata
+}
+
+// ============================================================
+// SECCIÓN 16: REPORTES Y REGULATORIOS (SENASA, SIGICA, CCIR)
+// ============================================================
+
+/// Certificado de Calidad e Inspección Retirada para exportación.
+model CCIR {
+  id                String   @id @default(cuid())
+  numeroCertificado String   @unique // Número único del certificado
+  fechaEmision      DateTime @default(now())
+
+  // Datos del producto
+  producto String // Descripción del producto
+  cantidad Float // Cantidad en KG
+  lote     String? // Lote/tropa de origen
+
+  // Destino
+  paisDestino   String // País de destino de la exportación
+  puertoDestino String? // Puerto de destino
+
+  // Datos del establecimiento
+  numeroEstablecimiento String? // N° de establecimiento habilitado
+  nombreEstablecimiento String? // Nombre del establecimiento
+  cuitEstablecimiento   String? // CUIT del establecimiento
+
+  // Datos del importador (opcional)
+  nombreImportador    String?
+  direccionImportador String?
+
+  // Contenedor/Transporte
+  numeroContenedor    String?
+  matriculaTransporte String?
+
+  // Precintos
+  numeroPrecintos String? // Números de precintos separados por coma
+
+  // Observaciones
+  observaciones String?
+
+  // Estado
+  estado EstadoCCIR @default(EMITIDO)
+
+  // Operador que generó
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  // Fechas de impresión
+  fechaImpresion DateTime?
+  vecesImpreso   Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fechaEmision])
+  @@index([estado])
+  @@index([paisDestino])
+}
+
+/// Destinatarios de reportes por email (stock, faena, rendimiento, alertas).
+model DestinatarioReporte {
+  id     String  @id @default(cuid())
+  nombre String // Nombre del destinatario
+  email  String // Dirección de email
+  activo Boolean @default(true) // Si está activo para recibir emails
+
+  // Tipos de reportes que recibe
+  recibeStock       Boolean @default(false) // Reportes de stock
+  recibeFaena       Boolean @default(false) // Reportes de faena diaria
+  recibeRendimiento Boolean @default(false) // Reportes de rendimiento
+  recibeAlertas     Boolean @default(false) // Alertas del sistema
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  historialesEnvio HistorialEnvio[]
+
+  @@index([email])
+  @@index([activo])
+}
+
+/// Programaciones de envío automático de reportes (frecuencia, hora, destinatarios).
+model ProgramacionReporte {
+  id     String @id @default(cuid())
+  nombre String // Nombre de la programación
+
+  // Tipo de reporte
+  tipoReporte TipoReporteEmail
+
+  // Configuración de envío
+  frecuencia FrecuenciaEmail
+  horaEnvio  Int             @default(8) // Hora del día (0-23)
+  diaSemana  Int? // Día de la semana (0=Domingo, 6=Sábado) para semanal
+  diaMes     Int? // Día del mes (1-31) para mensual
+
+  // Destinatarios (lista de IDs separados por coma o JSON)
+  destinatarios String // IDs de DestinatarioReporte separados por coma
+
+  // Estado
+  activo       Boolean   @default(true)
+  ultimoEnvio  DateTime?
+  proximoEnvio DateTime?
+
+  // Configuración adicional
+  incluirGraficos Boolean        @default(true)
+  formato         FormatoReporte @default(PDF)
+
+  observaciones String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  historialesEnvio HistorialEnvio[]
+
+  @@index([tipoReporte])
+  @@index([activo])
+  @@index([proximoEnvio])
+}
+
+/// Historial de envíos de reportes por email (estado, error, reintentos).
+model HistorialEnvio {
+  id String @id @default(cuid())
+
+  // Referencias
+  programacionId String?
+  programacion   ProgramacionReporte? @relation(fields: [programacionId], references: [id])
+  destinatarioId String?
+  destinatario   DestinatarioReporte? @relation(fields: [destinatarioId], references: [id])
+
+  // Datos del envío
+  tipoReporte       TipoReporteEmail
+  asunto            String
+  destinatarioEmail String // Email del destinatario (denormalizado)
+
+  // Estado del envío
+  estado         EstadoEnvioEmail @default(PENDIENTE)
+  fechaEnvio     DateTime         @default(now())
+  fechaProcesado DateTime?
+
+  // Información adicional
+  error         String? // Mensaje de error si falló
+  reintentos    Int     @default(0)
+  tamanoArchivo Int? // Tamaño del archivo adjunto en bytes
+
+  // Contenido
+  contenidoResumen String? // Resumen del contenido enviado
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipoReporte])
+  @@index([estado])
+  @@index([fechaEnvio])
+  @@index([destinatarioEmail])
+}
+
+/// Reportes enviados a SENASA (faena mensual, existencias, decomisos, producción).
+model ReporteSenasa {
+  id String @id @default(cuid())
+
+  // Tipo de reporte
+  tipoReporte TipoReporteSenasa
+
+  // Período del reporte
+  fechaDesde DateTime
+  fechaHasta DateTime
+  periodo    String // Descripción del período (ej: "Enero 2024")
+
+  // Estado del envío
+  estado            EstadoReporteSenasa @default(PENDIENTE)
+  fechaEnvio        DateTime?
+  fechaConfirmacion DateTime?
+
+  // Error
+  mensajeError String?
+  reintentos   Int     @default(0)
+
+  // Archivo generado
+  archivoNombre String?
+  archivoUrl    String?
+
+  // Datos del reporte (JSON)
+  datosReporte String? // Resumen de datos incluidos
+
+  // Observaciones
+  observaciones String?
+
+  // Operador que generó
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipoReporte])
+  @@index([estado])
+  @@index([fechaDesde])
+  @@index([fechaEnvio])
+}
+
+/// Plantillas de reportes Excel con marcadores y rango de datos.
+model PlantillaReporte {
+  id          String  @id @default(cuid())
+  nombre      String  @unique // "Planilla Faena Diaria", "Reporte SENASA"
+  codigo      String  @unique // "FAENA_DIARIA", "SENASA_MENSUAL"
+  descripcion String?
+
+  // Archivo de plantilla
+  archivoNombre    String // Original filename
+  archivoContenido String // Base64 encoded Excel file
+
+  // Configuración de marcadores
+  marcadores String? // JSON: {"A5": "{{FECHA}}", "B5": "{{TROPA}}"}
+  hojaDatos  String? @default("Datos") // Nombre de la hoja donde van los datos
+  filaInicio Int     @default(1) // Fila donde empiezan los datos
+
+  // Rango de datos (para tablas)
+  rangoDatos String? // "A7:F50" - donde se insertan filas
+  columnas   String? // JSON: ["fecha", "tropa", "cabezas", "peso"]
+
+  // Configuración de impresión
+  orientacion String? @default("portrait") // portrait | landscape
+  tamanoPapel String? @default("A4")
+
+  // Estado
+  activo    Boolean @default(true)
+  categoria String? // FAENA, STOCK, DESPOSTADA, SENASA
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoria])
+  @@index([activo])
+}
+
+/// Autorizaciones para envío de reportes regulatorios (solicitado, aprobado, rechazado).
+model AutorizacionReporte {
+  id                String    @id @default(cuid())
+  tipoReporte       String
+  datosReporte      String?
+  resumenReporte    String?
+  solicitadoPorId   String
+  solicitadoPor     String
+  destinatarios     String
+  copiasOcultas     String?
+  motivoSolicitud   String?
+  fechaVigencia     DateTime?
+  estado            String    @default("PENDIENTE")
+  autorizadoPorId   String?
+  autorizadoPor     String?
+  fechaAutorizacion DateTime?
+  motivoRechazo     String?
+  fechaSolicitud    DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([estado])
+}
+
+/// Configuración de integración con SIGICA (Sistema de Información Ganadera).
+model ConfiguracionSIGICA {
+  id                   String    @id @default(cuid())
+  habilitado           Boolean   @default(false)
+  urlServicio          String?
+  usuario              String?
+  password             String?
+  certificado          String?
+  establecimiento      String?
+  ultimaSincronizacion DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+/// Envíos de datos a SIGICA con estado, respuesta y reintentos.
+model EnvioSIGICA {
+  id                String    @id @default(cuid())
+  tipo              String
+  datosEnviados     String?
+  cantidadRegistros Int?
+  estado            String    @default("ENVIANDO")
+  respuestaSIGICA   String?
+  codigoTransaccion String?
+  mensajeError      String?
+  romaneoIds        String?
+  operadorId        String?
+  operador          Operador? @relation("EnvioSIGICAOperador", fields: [operadorId], references: [id])
+  intentos          Int       @default(0)
+  ultimoIntento     DateTime?
+  fechaEnvio        DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tipo])
+  @@index([estado])
+  @@index([operadorId])
+  @@index([fechaEnvio])
+}
+
+/// Stock de cámara sincronizado con SIGICA (medias, kg, bovinos, equinos).
+model StockCamaraSIGICA {
+  id                  String    @id @default(cuid())
+  camaraId            String    @unique
+  camara              Camara    @relation(fields: [camaraId], references: [id])
+  totalMedias         Int       @default(0)
+  totalKg             Float     @default(0)
+  bovinosMedias       Int       @default(0)
+  bovinosKg           Float     @default(0)
+  equinosMedias       Int       @default(0)
+  equinosKg           Float     @default(0)
+  remanenteKg         Float     @default(0)
+  sincronizado        Boolean   @default(false)
+  ultimaActualizacion DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+/// Configuración de reportes automáticos (tipo, formato, frecuencia, destinatarios).
+model ReporteAutomatico {
+  id            String    @id @default(cuid())
+  nombre        String
+  descripcion   String?
+  tipo          String
+  formato       String    @default("PDF")
+  frecuencia    String
+  diaSemana     Int?
+  diaMes        Int?
+  hora          String    @default("08:00")
+  destinatarios String
+  activo        Boolean   @default(true)
+  proximoEnvio  DateTime?
+  ultimoEnvio   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+/// Estados de CCIR: EMITIDO, ANULADO, EXPORTADO.
+enum EstadoCCIR {
+  EMITIDO
+  ANULADO
+  EXPORTADO
+}
+
+/// Estados de declaración jurada: ACTIVA, ANULADA, UTILIZADA.
+enum EstadoDeclaracionJurada {
+  ACTIVA
+  ANULADA
+  UTILIZADA
+}
+
+/// Tipos de reporte por email: stock/faena/rendimiento (diario/semanal), alertas, resumen mensual.
+enum TipoReporteEmail {
+  STOCK_DIARIO // Reporte de stock diario
+  STOCK_SEMANAL // Reporte de stock semanal
+  FAENA_DIARIO // Reporte de faena diario
+  FAENA_SEMANAL // Reporte de faena semanal
+  RENDIMIENTO_DIARIO // Reporte de rendimiento diario
+  RENDIMIENTO_SEMANAL // Reporte de rendimiento semanal
+  ALERTA_STOCK_BAJO // Alerta de stock bajo
+  ALERTA_CAMARA // Alerta de capacidad de cámara
+  RESUMEN_MENSUAL // Resumen mensual completo
+  PERSONALIZADO // Reporte personalizado
+}
+
+/// Frecuencias de envío de reportes: DIARIO, SEMANAL, QUINCENAL, MENSUAL, MANUAL.
+enum FrecuenciaEmail {
+  DIARIO // Todos los días
+  SEMANAL // Una vez por semana
+  QUINCENAL // Cada 15 días
+  MENSUAL // Una vez por mes
+  MANUAL // Solo envío manual
+}
+
+/// Estados de envío de email: PENDIENTE, ENVIANDO, ENVIADO, ERROR, REINTENTO.
+enum EstadoEnvioEmail {
+  PENDIENTE // Pendiente de envío
+  ENVIANDO // En proceso de envío
+  ENVIADO // Enviado exitosamente
+  ERROR // Error en el envío
+  REINTENTO // Pendiente de reintento
+}
+
+/// Formatos de reporte: PDF, EXCEL, AMBOS.
+enum FormatoReporte {
+  PDF // Formato PDF
+  EXCEL // Formato Excel
+  AMBOS // Ambos formatos
+}
+
+/// Tipos de reporte SENASA: FAENA_MENSUAL, EXISTENCIAS, MOVIMIENTOS, DECOMISOS, PRODUCCION, STOCK.
+enum TipoReporteSenasa {
+  FAENA_MENSUAL
+  EXISTENCIAS
+  MOVIMIENTOS
+  DECOMISOS
+  PRODUCCION
+  STOCK
+}
+
+/// Estados de reporte SENASA: PENDIENTE, ENVIADO, CONFIRMADO, ERROR, ANULADO.
+enum EstadoReporteSenasa {
+  PENDIENTE
+  ENVIADO
+  CONFIRMADO
+  ERROR
+  ANULADO
+}
+
+// ============================================================
+// SECCIÓN 17: SISTEMA — USUARIOS, SESIONES, AUDITORÍA
+// ============================================================
+
+/// Operadores del sistema con permisos granulares por módulo y PIN de supervisor.
+model Operador {
+  id       String      @id @default(cuid())
+  nombre   String
+  usuario  String      @unique
+  password String // Hash de la contraseña
+  pin      String? // PIN numérico opcional
+  rol      RolOperador @default(OPERADOR)
+  email    String?
+  activo   Boolean     @default(true)
+
+  // Permisos detallados
+  puedePesajeCamiones     Boolean @default(true)
+  puedePesajeIndividual   Boolean @default(true)
+  puedeMovimientoHacienda Boolean @default(true)
+  puedeListaFaena         Boolean @default(false)
+  puedeRomaneo            Boolean @default(false)
+  puedeIngresoCajon       Boolean @default(false)
+  puedeMenudencias        Boolean @default(false)
+  puedeStock              Boolean @default(false)
+  puedeReportes           Boolean @default(false)
+  puedeCCIR               Boolean @default(false)
+  puedeFacturacion        Boolean @default(false)
+  puedeConfiguracion      Boolean @default(false)
+  puedeDesposte           Boolean @default(false) // C2: produccion, subproductos, degradacion, ingreso desposte
+  puedeCuarteo            Boolean @default(false) // Cuarteo de medias
+  puedeEmpaque            Boolean @default(false) // Empaque y cajas
+  puedeExpedicionC2       Boolean @default(false) // Expedición C2 y pallets
+  puedeAutorizarReportes  Boolean @default(false) // Autorizar envío de reportes
+  puedeCalidad            Boolean @default(false) // Módulo de Calidad (reclamos, pH, novedades)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // PIN de supervisor (para validación en romaneo y operaciones críticas)
+  pinSupervisor String? // PIN de 4-6 dígitos para autorizaciones
+
+  // Relaciones
+  pesajesCamion                    PesajeCamion[]
+  pesajesIndividuales              PesajeIndividual[]
+  tropasCreadas                    Tropa[]
+  listasFaena                      ListaFaena[]
+  romaneos                         Romaneo[]
+  movimientosCorral                MovimientoCorral[]
+  movimientosCamara                MovimientoCamara[]
+  auditorias                       Auditoria[]
+  facturas                         Factura[]
+  ccirs                            CCIR[]
+  declaracionesJuradas             DeclaracionJurada[]
+  listasFaenaVB                    ListaFaena[]              @relation("VBRomaneoOperador")
+  despachos                        Despacho[]
+  cueros                           Cuero[]
+  registrosRendering               RegistroRendering[]
+  lotesDespostada                  LoteDespostada[]
+  movimientosDespostada            MovimientoDespostada[]
+  registrosCuarteo                 RegistroCuarteo[]
+  registrosEmpaque                 RegistroEmpaque[]
+  ingresosDespostada               IngresoDespostada[]
+  reportesSenasa                   ReporteSenasa[]
+  pagosFactura                     PagoFactura[]
+  decomisos                        Decomiso[]
+  grasasDressing                   GrasaDressing[]
+  pallets                          Pallet[]
+  notasCreditoDebito               NotaCreditoDebito[]
+  liquidacionesOperador            LiquidacionFaena[]        @relation("LiquidacionOperador")
+  liquidacionesSupervisor          LiquidacionFaena[]        @relation("LiquidacionSupervisor")
+  historicoTarifas                 HistoricoTarifa[]
+  c2MovimientosDegradacion         C2MovimientoDegradacion[]
+  c2Subproductos                   C2SubproductoPesaje[]
+  c2Expediciones                   C2ExpedicionOrden[]
+  preferenciasUI                   PreferenciasUI?
+  filtrosReportes                  FiltroReporte[]
+  sesiones                         Sesion[]                  @relation("SesionOperador")
+  sesionesRomaneo                  SesionRomaneo[]           @relation("SesionRomaneoOperador")
+  enviosSIGICA                     EnvioSIGICA[]             @relation("EnvioSIGICAOperador")
+  flujosFaenaVerificador           FlujoFaena[]              @relation("FlujoVerificador")
+  flujosFaenaSupervisor            FlujoFaena[]              @relation("FlujoSupervisor")
+  movimientosCaja                  MovimientoCaja[]
+  pagos                            Pago[]
+  arqueosCajaOperador              ArqueoCaja[]              @relation("ArqueoCajaOperador")
+  arqueosCajaSupervisor            ArqueoCaja[]              @relation("ArqueoCajaSupervisor")
+  observacionesUsuario             ObservacionUsuario[]
+  ingresosTercero                  IngresoTercero[]
+  pesajesInternos                  PesajeInterno[]
+  rendimientosFaena                RindeFaena[]
+  notaCreditoCliente               NotaCredito[]
+  notaDebitoCliente                NotaDebito[]
+  movimientosInsumo                MovimientoInsumo[]
+  historialPreciosInsumo           HistorialPrecioInsumo[]
+  historicoPrecioProductoHistorico HistoricoPrecioProducto[]
+  historicoPrecio                  HistoricoPrecio[]
+  ordenCompra                      OrdenCompra[]
+  recepcionesCompra                RecepcionCompra[]
+  actividades                      ActividadOperador[]
+  asientosContables                AsientoContable[]
+  alertasResueltas                 AlertaStock[]             @relation("AlertasResueltas")
+  medicionesPH                     MedicionPH[]
+
+  @@index([usuario])
+}
+
+/// Registro de auditoría de acciones del sistema (CRUD, login, logout).
+model Auditoria {
+  id         String    @id @default(cuid())
+  operadorId String?
+  operador   Operador? @relation(fields: [operadorId], references: [id])
+
+  modulo       String
+  accion       String // CREATE, UPDATE, DELETE, LOGIN, LOGOUT
+  entidad      String
+  entidadId    String?
+  descripcion  String
+  datosAntes   String? // JSON
+  datosDespues String? // JSON
+
+  fecha DateTime @default(now())
+  ip    String?
+
+  @@index([modulo])
+  @@index([fecha])
+}
+
+/// Actividad detallada de operadores (módulo, tipo, datos, IP, user agent).
+model ActividadOperador {
+  id          String    @id @default(cuid())
+  operadorId  String?
+  operador    Operador? @relation(fields: [operadorId], references: [id])
+  tipo        String // LOGIN, LOGOUT, CREAR, MODIFICAR, ELIMINAR, etc.
+  modulo      String // auth, dashboard, pesajeCamiones, romaneo, etc.
+  descripcion String
+  entidad     String?
+  entidadId   String?
+  datos       String? // JSON stringified
+  ip          String?
+  userAgent   String?
+  sessionId   String?
+  fecha       DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([operadorId])
+  @@index([tipo])
+  @@index([modulo])
+  @@index([fecha])
+}
+
+/// Sesiones activas de operadores (IP, user agent, expiración, cierre).
+model Sesion {
+  id              String    @id @default(cuid())
+  operadorId      String
+  operador        Operador  @relation("SesionOperador", fields: [operadorId], references: [id])
+  ip              String
+  userAgent       String?
+  activa          Boolean   @default(true)
+  fechaInicio     DateTime  @default(now())
+  fechaExpiracion DateTime
+  fechaCierre     DateTime?
+  motivoCierre    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([operadorId])
+  @@index([activa])
+}
+
+/// Intentos de login (exitosos o fallidos) con IP y operador.
+model IntentoLogin {
+  id         String   @id @default(cuid())
+  operadorId String?
+  ip         String
+  exitoso    Boolean
+  fecha      DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([ip])
+  @@index([operadorId])
+  @@index([fecha])
+}
+
+/// IPs bloqueadas por seguridad (manual o automático) con expiración.
+model IpBloqueada {
+  id              String    @id @default(cuid())
+  ip              String
+  motivo          String    @default("MANUAL")
+  activo          Boolean   @default(true)
+  fechaBloqueo    DateTime  @default(now())
+  fechaExpiracion DateTime?
+  operadorId      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([ip])
+  @@index([activo])
+}
+
+/// Roles de operador: OPERADOR, SUPERVISOR, ADMINISTRADOR.
+enum RolOperador {
+  OPERADOR
+  SUPERVISOR
+  ADMINISTRADOR
+}
+
+// ============================================================
+// SECCIÓN 18: SISTEMA — PREFERENCIAS, BORRADORES, FILTROS
+// ============================================================
+
+/// Auto-guardado de formularios en progreso (Layer 2) para recuperación.
+model Borrador {
+  id         String         @id @default(cuid())
+  modulo     String // ej: 'pesajeCamiones', 'romaneo', etc.
+  operadorId String? // Quien está editando
+  datos      String // JSON con los datos del formulario
+  estado     EstadoBorrador @default(ACTIVO)
+
+  // Para recuperar el borrador correcto (1 borrador activo por módulo+operador)
+  sesionKey String? // Clave única de sesión (módulo + operador)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([modulo, sesionKey])
+  @@index([modulo])
+  @@index([operadorId])
+  @@index([estado])
+}
+
+/// Preferencias de interfaz por operador (tema, módulos visibles, sidebar).
+model PreferenciasUI {
+  id         String @id @default(cuid())
+  operadorId String @unique
+
+  // Orden y configuración de módulos (JSON)
+  moduloOrden   String? // JSON array: ["pesajeCamiones", "romaneo", ...]
+  moduloTamano  String? // JSON object: {"pesajeCamiones": "large", ...}
+  moduloVisible String? // JSON object: {"pesajeCamiones": true, ...}
+  moduloColor   String? // JSON object: {"pesajeCamiones": "bg-amber-500", ...}
+
+  // Sidebar
+  sidebarExpandido Boolean @default(true)
+  gruposExpandidos String? // JSON array: ["faena", "stock"]
+
+  // Apariencia
+  tema         String @default("light") // light | dark | system
+  tamanoFuente String @default("normal") // small | normal | large
+  densidad     String @default("normal") // compact | normal | comfortable
+
+  // Navegación
+  paginaInicio String? // Módulo de inicio personalizado
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operador Operador @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+
+  @@index([operadorId])
+}
+
+/// Filtros favoritos de reportes guardados por operador.
+model FiltroReporte {
+  id         String   @id @default(cuid())
+  operadorId String
+  operador   Operador @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+
+  reportType String // 'faena' | 'stock' | 'tropas' | etc.
+  nombre     String // User-given name: "Faena mensual bovino"
+  filtros    String // JSON: { fechaDesde: "...", especie: "BOVINO", ... }
+
+  createdAt DateTime @default(now())
+
+  @@index([operadorId])
+  @@index([reportType])
+}
+
+/// Tipos de trabajo configurables (código, nombre, default) para productos.
+model TipoTrabajo {
+  id          String   @id @default(cuid())
+  codigo      String   @unique
+  nombre      String
+  descripcion String?
+  esDefault   Boolean  @default(false)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// KPIs configurados con metas y alertas (categoría, unidad, rango).
+model Indicador {
+  id           String   @id @default(cuid())
+  codigo       String   @unique
+  nombre       String
+  descripcion  String?
+  unidad       String
+  meta         Float?
+  alertaMinima Float?
+  alertaMaxima Float?
+  categoria    String
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  valores ValorIndicador[]
+
+  @@index([categoria])
+  @@index([activo])
+}
+
+/// Valores históricos de indicadores por fecha con desviación de meta.
+model ValorIndicador {
+  id            String    @id @default(cuid())
+  indicadorId   String
+  indicador     Indicador @relation(fields: [indicadorId], references: [id], onDelete: Cascade)
+  fecha         DateTime  @default(now())
+  valor         Float
+  valorMeta     Float?
+  desviacion    Float?
+  observaciones String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([indicadorId, fecha], name: "valorIndicador_indicador_fecha")
+  @@index([indicadorId])
+  @@index([fecha])
+}
+
+/// Estados de borrador (auto-guardado): ACTIVO, RECUPERADO, DESCARTADO, EXPIRADO.
+enum EstadoBorrador {
+  ACTIVO // Borrador en edición
+  RECUPERADO // Borrador recuperado por el operador
+  DESCARTADO // Borrador descartado manualmente
+  EXPIRADO // Borrador que expiró (más de 24hs)
+}
+
+// ============================================================
+// SECCIÓN 19: ENUMS
+// ============================================================
+

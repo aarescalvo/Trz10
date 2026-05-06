@@ -1,0 +1,62 @@
+[
+  {
+    "id": "corral-01",
+    "nombre": "CORRAL 1",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  },
+  {
+    "id": "corral-02",
+    "nombre": "CORRAL 2",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  },
+  {
+    "id": "corral-03",
+    "nombre": "CORRAL 3",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  },
+  {
+    "id": "corral-04",
+    "nombre": "CORRAL 4",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  },
+  {
+    "id": "corral-05",
+    "nombre": "CORRAL 5",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  },
+  {
+    "id": "corral-06",
+    "nombre": "CORRAL 6",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  },
+  {
+    "id": "corral-07",
+    "nombre": "CORRAL 7",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  },
+  {
+    "id": "corral-08",
+    "nombre": "CORRAL 8",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  },
+  {
+    "id": "corral-09",
+    "nombre": "CORRAL 9",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  },
+  {
+    "id": "corral-10",
+    "nombre": "CORRAL 10",
+    "capacidad": 50,
+    "observaciones": "Corrales Techados"
+  }
+]

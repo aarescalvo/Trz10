@@ -1,0 +1,132 @@
+[
+  {
+    "id": "cli-001",
+    "nombre": "BOSQUES AMADOS SRL",
+    "cuit": "30-70777069-0",
+    "email": "Bosqueamadosrl@gmail.com",
+    "telefono": "2996 72-8854",
+    "contacto": "IGNACIO",
+    "esProductor": true,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-002",
+    "nombre": "DISTRIBUIDORA DE LA PATAGONIA",
+    "cuit": "30-70950784-9",
+    "email": "Distribuidoradelapatagoniasrl@hotmil.com",
+    "telefono": "2942 66-4244",
+    "contacto": "GERARDO AGUILERA",
+    "esProductor": false,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-003",
+    "nombre": "DOS DE FIERRO SA",
+    "cuit": "30-71547553-3",
+    "email": "carnicerias.la.criolla@gmail.com",
+    "telefono": "2994 02-2200",
+    "contacto": "SERGIO",
+    "esProductor": false,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-004",
+    "nombre": "FERREYRA ALBERTO",
+    "cuit": "20-13671821-6",
+    "email": null,
+    "telefono": "2984 50-0770",
+    "contacto": "FERREYRA RUBEN ALBERTO",
+    "esProductor": false,
+    "esUsuarioFaena": false
+  },
+  {
+    "id": "cli-005",
+    "nombre": "FERREYRA MARTIN",
+    "cuit": "23-33532135-9",
+    "email": "martin_ferreyra_797@hotmail.com",
+    "telefono": "2984 50-7605",
+    "contacto": "FERREYRA MARTIN RUBEN",
+    "esProductor": false,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-006",
+    "nombre": "FRIGORIFICO DE LA PATAGONIA SRL",
+    "cuit": "30-71865346-7",
+    "email": "ganadospatagonicos@gmail.com",
+    "telefono": "2995 56-7306 / 2996 72-4022",
+    "contacto": "NADIA SUYAI / PEDRO SUAREZ",
+    "esProductor": false,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-007",
+    "nombre": "GANADERA NORTE NEUQUINO",
+    "cuit": "30-71642675-7",
+    "email": "adminsr@srfrigorifico.com.ar; hacienda@srfrigorifico.com.ar",
+    "telefono": "2994 01-8943",
+    "contacto": "SANDRA",
+    "esProductor": false,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-008",
+    "nombre": "LASAGNO JORGE ALBERTO",
+    "cuit": "20-25006786-1",
+    "email": null,
+    "telefono": null,
+    "contacto": "JORGE ALBERTO LASAGNO",
+    "esProductor": false,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-009",
+    "nombre": "MAIZALES DE LA PATAGONIA SRL",
+    "cuit": "30-71632527-6",
+    "email": "Ariel_trapial@hotmail.com",
+    "telefono": "2984 57-0584",
+    "contacto": "ARIEL ORTEGA",
+    "esProductor": true,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-010",
+    "nombre": "MORAGA",
+    "cuit": "20-39649862-7",
+    "email": "Valentinmoraga04@gmail.com",
+    "telefono": "2984 09-0464",
+    "contacto": "MORAGA MAXIMILIANO IVAN",
+    "esProductor": false,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-011",
+    "nombre": "MUCA SAS",
+    "cuit": "30-71649032-3",
+    "email": "tesoreria@muca.com.ar; mnogueira@muca.com.ar; compras@muca.com.ar",
+    "telefono": "2996 37-6511",
+    "contacto": "JOSE",
+    "esProductor": false,
+    "esUsuarioFaena": true
+  },
+  {
+    "id": "cli-012",
+    "nombre": "PETERSEN AGUSTIN ALEJANDRO",
+    "cuit": "20-40324354-0",
+    "email": "Lacapitalcarnes@gmail.com",
+    "telefono": "2920 61-5768",
+    "contacto": "AGUSTIN ALEJANDRO PETERSEN",
+    "esProductor": false,
+    "esUsuarioFaena": false
+  },
+  {
+    "id": "cli-013",
+    "nombre": "RUFFINI AGUSTIN",
+    "cuit": "20-40321341-2",
+    "email": null,
+    "telefono": "2984 92-4736",
+    "contacto": "AGUSTIN RUFFINI",
+    "esProductor": false,
+    "esUsuarioFaena": false
+  }
+]

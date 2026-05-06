@@ -1,0 +1,37 @@
+[
+  {
+    "id": "tip-01",
+    "nombre": "NELSON",
+    "apellido": "ALFARO",
+    "numero": "1",
+    "matricula": "TIP-001"
+  },
+  {
+    "id": "tip-02",
+    "nombre": "DARIO",
+    "apellido": "GONZALES",
+    "numero": "2",
+    "matricula": "TIP-002"
+  },
+  {
+    "id": "tip-03",
+    "nombre": "ALAN",
+    "apellido": "ARES CALVO",
+    "numero": "3",
+    "matricula": "TIP-003"
+  },
+  {
+    "id": "tip-04",
+    "nombre": "ALBERTO",
+    "apellido": "VILLANUEVA",
+    "numero": "4",
+    "matricula": "TIP-004"
+  },
+  {
+    "id": "tip-05",
+    "nombre": "SERGIO",
+    "apellido": "PEREZ",
+    "numero": "5",
+    "matricula": "TIP-005"
+  }
+]

@@ -3,9 +3,10 @@
     Helper para enviar datos RAW a impresora Windows.
     Usado por Printer Bridge (index.js).
 
-    Estrategia en 2 pasos:
-    1) Intenta via Win32 Spooler API (RAW) - compatible con Zebra
-    2) Si falla con error 1804 (datatype no soportado), envia directo al puerto USB - compatible con Datamax
+    Estrategia en 3 pasos:
+    1) Win32 Spooler API con RAW (StartDocPrinter) - Zebra
+    2) Win32 Spooler: OpenPrinter + WritePrinter directo (sin StartDocPrinter) - Datamax
+    3) Si ambos fallan, indica instalar driver Generic/Text Only
 
 .PARAMETER PrinterName
     Nombre exacto de la impresora en Windows.
@@ -37,13 +38,10 @@ if ($fileSize -eq 0) {
 $data = [System.IO.File]::ReadAllBytes($FilePath)
 
 # ============================================================
-# Metodo 1: Win32 Spooler API con datatype RAW
+# Cargar Win32 API
 # ============================================================
-function Print-viaSpooler {
-    param([string]$Printer, [byte[]]$Bytes)
-
-    try {
-        $code = @'
+try {
+    $code = @'
 using System;
 using System.Runtime.InteropServices;
 
@@ -82,12 +80,20 @@ public class SpoolerRaw
     public static extern uint GetLastError();
 }
 '@
-        if (-not ([System.Management.Automation.PSTypeName]'SpoolerRaw').Type) {
-            Add-Type -TypeDefinition $code -Language CSharp | Out-Null
-        }
-    } catch {
-        throw "Cargando Win32 API: $($_.Exception.Message)"
+    if (-not ([System.Management.Automation.PSTypeName]'SpoolerRaw').Type) {
+        Add-Type -TypeDefinition $code -Language CSharp | Out-Null
     }
+} catch {
+    Write-Output "ERROR:Cargando Win32 API: $($_.Exception.Message)"
+    exit 1
+}
+
+# ============================================================
+# Metodo 1: Spooler completo (Open + StartDoc + StartPage + Write + End)
+# Funciona con Zebra y drivers que soportan RAW
+# ============================================================
+function Print-viaSpoolerFull {
+    param([string]$Printer, [byte[]]$Bytes)
 
     $docInfo = New-Object SpoolerRaw+DOC_INFO_1
     $docInfo.pDocName = "PrinterBridge"
@@ -139,51 +145,36 @@ public class SpoolerRaw
 }
 
 # ============================================================
-# Metodo 2: Escritura directa al puerto de la impresora (USB/LPT/COM)
-# Para impresoras donde el driver no soporta RAW (error 1804)
+# Metodo 2: OpenPrinter + WritePrinter directo (sin StartDoc)
+# Para drivers Datamax que no soportan datatype RAW (error 1804)
+# WritePrinter envia bytes raw sin validar datatype
 # ============================================================
-function Print-viaPort {
+function Print-viaWriteDirect {
     param([string]$Printer, [byte[]]$Bytes)
 
-    # Obtener el puerto de la impresora
-    try {
-        $printerObj = Get-Printer -Name $Printer -ErrorAction Stop
-        $portName = $printerObj.PortName
-    } catch {
-        throw "No se pudo obtener el puerto de la impresora '$Printer'"
-    }
+    $hPrinter = [IntPtr]::Zero
 
-    # Si es puerto de red (WSD, TCP/IP), intentar resolver
-    if ($portName -like "WSD_*" -or $portName -like "*_*") {
-        # Para puertos WSD o de red, necesitamos otra estrategia
-        throw "La impresora usa puerto de red ($portName). El modo directo a puerto no aplica. Instala un driver Generic/Text Only."
-    }
-
-    # Buscar el archivo del puerto en el spooler
-    $portPath = "\\.\$portName"
-
-    # Si es USB001, USB002, etc., o LPT1, COM1, etc.
-    if ($portName -match '^(USB\d+|LPT\d+|COM\d+)$') {
-        $portPath = "\\.\$portName"
-    } elseif ($portName -match '^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$') {
-        # Puerto IP directo
-        throw "Puerto IP detectado ($portName). El bridge deberia recibir por TCP en ese puerto."
-    } else {
-        $portPath = "\\.\$portName"
+    $result = [SpoolerRaw]::OpenPrinter($Printer, [ref]$hPrinter, [IntPtr]::Zero)
+    if (-not $result) {
+        $errCode = [SpoolerRaw]::GetLastError()
+        throw "OpenPrinter codigo:$errCode"
     }
 
     try {
-        $fs = [System.IO.File]::OpenWrite($portPath)
-        try {
-            $fs.Write($Bytes, 0, $Bytes.Length)
-            $fs.Flush()
-            return @{ success = $true; bytes = $Bytes.Length }
-        } finally {
-            $fs.Close()
-            $fs.Dispose()
+        $written = 0
+
+        $result = [SpoolerRaw]::WritePrinter($hPrinter, $Bytes, $Bytes.Length, [ref]$written)
+        if (-not $result) {
+            $errCode = [SpoolerRaw]::GetLastError()
+            throw "WritePrinter codigo:$errCode"
         }
-    } catch {
-        throw "No se pudo escribir al puerto $portPath : $($_.Exception.Message)"
+
+        return @{ success = $true; bytes = $written }
+
+    } finally {
+        if ($hPrinter -ne [IntPtr]::Zero) {
+            [SpoolerRaw]::ClosePrinter($hPrinter) | Out-Null
+        }
     }
 }
 
@@ -191,39 +182,38 @@ function Print-viaPort {
 # Ejecucion principal
 # ============================================================
 
-# Intentar Metodo 1: Spooler API
-$spoolerResult = $null
+# Intentar Metodo 1: Spooler completo con RAW
 $spoolerError = $null
 
 try {
-    $spoolerResult = Print-viaSpooler -Printer $PrinterName -Bytes $data
-    if ($spoolerResult.success) {
-        Write-Output "OK:$($spoolerResult.bytes)"
+    $result = Print-viaSpoolerFull -Printer $PrinterName -Bytes $data
+    if ($result.success) {
+        Write-Output "OK:$($result.bytes)"
         exit 0
     }
 } catch {
     $spoolerError = $_.Exception.Message
 }
 
-# Si fallo con error 1804 (datatype no soportado), intentar Metodo 2: Puerto directo
+# Si fallo con error 1804 (datatype no soportado), intentar Metodo 2
 if ($spoolerError -match 'codigo:1804') {
     try {
-        $portResult = Print-viaPort -Printer $PrinterName -Bytes $data
-        if ($portResult.success) {
-            Write-Output "OK:$($portResult.bytes)"
+        $result = Print-viaWriteDirect -Printer $PrinterName -Bytes $data
+        if ($result.success) {
+            Write-Output "OK:$($result.bytes)"
             exit 0
         }
     } catch {
-        $portError = $_.Exception.Message
-        Write-Output "ERROR:Spooler no soporta RAW (error 1804) y el puerto directo tambien fallo: $portError"
-        Write-Output "SOLUCION: Instala la impresora con driver 'Generic / Text Only' (Generico / Solo texto)."
-        Write-Output "  1. Panel de control > Dispositivos e impresoras"
-        Write-Output "  2. Agregar impresora > La impresora que quiero no esta en la lista"
-        Write-Output "  3. Agregar impresora local > Crear puerto nuevo > Usar puerto existente"
-        Write-Output "  4. Seleccionar el puerto donde esta conectada la Datamax (ej: USB001)"
+        $directError = $_.Exception.Message
+        Write-Output "ERROR:El driver Datamax no soporta RAW (error 1804) y WritePrinter directo tambien fallo: $directError"
+        Write-Output "SOLUCION: Instala un segundo driver 'Generic / Text Only' para la misma impresora."
+        Write-Output "  1. Abrí: Dispositivos e impresoras > Agregar impresora"
+        Write-Output "  2. 'La impresora que quiero no esta en la lista'"
+        Write-Output "  3. 'Agregar una impresora local con ajustes manuales'"
+        Write-Output "  4. Usar puerto existente: USB001"
         Write-Output "  5. Fabricante: Generic > Modelo: Generic / Text Only"
-        Write-Output "  6. Nombrala 'Datamax M-4206 Mark II (Generic)'"
-        Write-Output "  7. Configura el bridge con ese nombre"
+        Write-Output "  6. Nombre: Datamax Generic (RAW)"
+        Write-Output "  7. Luego configurar el bridge con: Datamax Generic (RAW)"
         exit 1
     }
 } else {

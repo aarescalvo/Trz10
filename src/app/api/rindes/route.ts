@@ -13,81 +13,10 @@ export async function GET(request: NextRequest) {
     const tropaId = searchParams.get('tropaId')
     const fechaDesde = searchParams.get('fechaDesde')
     const fechaHasta = searchParams.get('fechaHasta')
-
-    // Construir filtros
-    const where: Prisma.RomaneoWhereInput = {
-      estado: 'CONFIRMADO'
-    }
-
-    if (fechaDesde || fechaHasta) {
-      where.fecha = {}
-      if (fechaDesde) where.fecha.gte = new Date(fechaDesde)
-      if (fechaHasta) where.fecha.lte = new Date(fechaHasta + 'T23:59:59')
-    }
-
-    // Obtener romaneos con datos agrupados por tropa
-    const romaneos = await db.romaneo.findMany({
-      where,
-      include: {
-        tipificador: true
-      },
-      orderBy: { fecha: 'desc' }
-    })
-
-    // Agrupar por tropaCodigo
-    const rindesPorTropa: Record<string, {
-      tropaCodigo: string
-      cantidadAnimales: number
-      pesoVivoTotal: number
-      pesoFaenaTotal: number
-      rindePromedio: number
-      rindeMinimo: number
-      rindeMaximo: number
-      animales: typeof romaneos
-    }> = {}
-
-    for (const romaneo of romaneos) {
-      const codigoTropa = romaneo.tropaCodigo || 'SIN-TROPA'
-      
-      if (!rindesPorTropa[codigoTropa]) {
-        rindesPorTropa[codigoTropa] = {
-          tropaCodigo: codigoTropa,
-          cantidadAnimales: 0,
-          pesoVivoTotal: 0,
-          pesoFaenaTotal: 0,
-          rindePromedio: 0,
-          rindeMinimo: 100,
-          rindeMaximo: 0,
-          animales: []
-        }
-      }
-
-      const grupo = rindesPorTropa[codigoTropa]
-      grupo.cantidadAnimales++
-      grupo.pesoVivoTotal += romaneo.pesoVivo || 0
-      grupo.pesoFaenaTotal += romaneo.pesoTotal || 0
-      grupo.animales.push(romaneo)
-
-      if (romaneo.rinde) {
-        grupo.rindeMinimo = Math.min(grupo.rindeMinimo, romaneo.rinde)
-        grupo.rindeMaximo = Math.max(grupo.rindeMaximo, romaneo.rinde)
-      }
-    }
-
-    // Calcular rindes promedio
-    const resultado = Object.values(rindesPorTropa).map(grupo => {
-      const rindePromedio = grupo.pesoVivoTotal > 0 
-        ? (grupo.pesoFaenaTotal / grupo.pesoVivoTotal) * 100 
-        : 0
-      
-      return {
-        ...grupo,
-        rindePromedio: Math.round(rindePromedio * 100) / 100,
-        pesoVivoTotal: Math.round(grupo.pesoVivoTotal * 100) / 100,
-        pesoFaenaTotal: Math.round(grupo.pesoFaenaTotal * 100) / 100,
-        animales: undefined // No enviar animales en listado general
-      }
-    }).sort((a, b) => b.rindePromedio - a.rindePromedio)
+    const tropaDesde = searchParams.get('tropaDesde')
+    const tropaHasta = searchParams.get('tropaHasta')
+    const usuario = searchParams.get('usuario')
+    const proveedor = searchParams.get('proveedor')
 
     // Si se solicita una tropa específica, devolver detalle
     if (tropaId) {
@@ -142,6 +71,125 @@ export async function GET(request: NextRequest) {
         }
       })
     }
+
+    // Filtros de tropa (proveedor, usuario, rango de tropa)
+    const tropaWhere: Prisma.TropaWhereInput = {}
+
+    if (proveedor) {
+      tropaWhere.productor = {
+        OR: [
+          { nombre: { contains: proveedor, mode: 'insensitive' } },
+          { razonSocial: { contains: proveedor, mode: 'insensitive' } }
+        ]
+      }
+    }
+
+    if (usuario) {
+      tropaWhere.usuarioFaena = {
+        OR: [
+          { nombre: { contains: usuario, mode: 'insensitive' } },
+          { razonSocial: { contains: usuario, mode: 'insensitive' } }
+        ]
+      }
+    }
+
+    if (tropaDesde || tropaHasta) {
+      tropaWhere.numero = {}
+      if (tropaDesde) tropaWhere.numero.gte = parseInt(tropaDesde)
+      if (tropaHasta) tropaWhere.numero.lte = parseInt(tropaHasta)
+    }
+
+    // Buscar tropas que coincidan con los filtros
+    const tropasFiltradas = await db.tropa.findMany({
+      where: tropaWhere,
+      select: { codigo: true, productor: { select: { nombre: true } }, usuarioFaena: { select: { nombre: true } } }
+    })
+
+    const codigosTropas = new Set(tropasFiltradas.map(t => t.codigo))
+
+    // Construir filtros para romaneo
+    const romaneoWhere: Prisma.RomaneoWhereInput = {
+      estado: 'CONFIRMADO'
+    }
+
+    if (fechaDesde || fechaHasta) {
+      romaneoWhere.fecha = {}
+      if (fechaDesde) romaneoWhere.fecha.gte = new Date(fechaDesde)
+      if (fechaHasta) romaneoWhere.fecha.lte = new Date(fechaHasta + 'T23:59:59')
+    }
+
+    // Si hay filtros de tropa, limitar romaneos a esos códigos
+    if (codigosTropas.size > 0) {
+      romaneoWhere.tropaCodigo = { in: [...codigosTropas] }
+    }
+
+    // Obtener romaneos con datos agrupados por tropa
+    const romaneos = await db.romaneo.findMany({
+      where: romaneoWhere,
+      include: {
+        tipificador: true
+      },
+      orderBy: { fecha: 'desc' }
+    })
+
+    // Crear mapa de tropas para obtener productor/usuario
+    const tropaMap = new Map(tropasFiltradas.map(t => [t.codigo, t]))
+
+    // Agrupar por tropaCodigo
+    const rindesPorTropa: Record<string, {
+      tropaCodigo: string
+      cantidadAnimales: number
+      pesoVivoTotal: number
+      pesoFaenaTotal: number
+      rindePromedio: number
+      rindeMinimo: number
+      rindeMaximo: number
+      productor: string | null
+      usuario: string | null
+    }> = {}
+
+    for (const romaneo of romaneos) {
+      const codigoTropa = romaneo.tropaCodigo || 'SIN-TROPA'
+      
+      if (!rindesPorTropa[codigoTropa]) {
+        const tropaInfo = tropaMap.get(codigoTropa)
+        rindesPorTropa[codigoTropa] = {
+          tropaCodigo: codigoTropa,
+          cantidadAnimales: 0,
+          pesoVivoTotal: 0,
+          pesoFaenaTotal: 0,
+          rindePromedio: 0,
+          rindeMinimo: 100,
+          rindeMaximo: 0,
+          productor: tropaInfo?.productor?.nombre || null,
+          usuario: tropaInfo?.usuarioFaena?.nombre || null,
+        }
+      }
+
+      const grupo = rindesPorTropa[codigoTropa]
+      grupo.cantidadAnimales++
+      grupo.pesoVivoTotal += romaneo.pesoVivo || 0
+      grupo.pesoFaenaTotal += romaneo.pesoTotal || 0
+
+      if (romaneo.rinde) {
+        grupo.rindeMinimo = Math.min(grupo.rindeMinimo, romaneo.rinde)
+        grupo.rindeMaximo = Math.max(grupo.rindeMaximo, romaneo.rinde)
+      }
+    }
+
+    // Calcular rindes promedio
+    const resultado = Object.values(rindesPorTropa).map(grupo => {
+      const rindePromedio = grupo.pesoVivoTotal > 0 
+        ? (grupo.pesoFaenaTotal / grupo.pesoVivoTotal) * 100 
+        : 0
+      
+      return {
+        ...grupo,
+        rindePromedio: Math.round(rindePromedio * 100) / 100,
+        pesoVivoTotal: Math.round(grupo.pesoVivoTotal * 100) / 100,
+        pesoFaenaTotal: Math.round(grupo.pesoFaenaTotal * 100) / 100,
+      }
+    }).sort((a, b) => b.rindePromedio - a.rindePromedio)
 
     // Estadísticas generales
     const totalAnimales = resultado.reduce((sum, t) => sum + t.cantidadAnimales, 0)

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { 
   TrendingUp, TrendingDown, BarChart3, Filter, RefreshCw, 
-  Eye, X, ChevronDown, ChevronUp, AlertCircle, Target
+  Eye, X, ChevronDown, ChevronUp, AlertCircle, Target,
+  Search, FileSpreadsheet, FileText, Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +16,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table'
 import { toast } from 'sonner'
+import { ExcelExporter } from '@/lib/export-excel'
+import { PDFExporter } from '@/lib/export-pdf'
 
 interface RindeTropa {
   tropaCodigo: string
@@ -24,6 +27,8 @@ interface RindeTropa {
   rindePromedio: number
   rindeMinimo: number
   rindeMaximo: number
+  productor: string | null
+  usuario: string | null
 }
 
 interface EstadisticasGenerales {
@@ -71,6 +76,10 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
   // Filtros
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
+  const [tropaDesde, setTropaDesde] = useState('')
+  const [tropaHasta, setTropaHasta] = useState('')
+  const [usuario, setUsuario] = useState('')
+  const [proveedor, setProveedor] = useState('')
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
   
   // Ordenamiento
@@ -96,16 +105,17 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
     }
   } | null>(null)
 
-  useEffect(() => {
-    fetchRindes()
-  }, [fechaDesde, fechaHasta])
-
-  const fetchRindes = async () => {
+  // Carga inicial
+  const fetchRindes = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (fechaDesde) params.append('fechaDesde', fechaDesde)
       if (fechaHasta) params.append('fechaHasta', fechaHasta)
+      if (tropaDesde) params.append('tropaDesde', tropaDesde)
+      if (tropaHasta) params.append('tropaHasta', tropaHasta)
+      if (usuario) params.append('usuario', usuario)
+      if (proveedor) params.append('proveedor', proveedor)
 
       const res = await fetch(`/api/rindes?${params.toString()}`)
       const data = await res.json()
@@ -121,6 +131,28 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
     } finally {
       setLoading(false)
     }
+  }, [fechaDesde, fechaHasta, tropaDesde, tropaHasta, usuario, proveedor])
+
+  // Cargar al montar
+  useState(() => {
+    fetchRindes()
+  })
+
+  const handleBuscar = () => {
+    fetchRindes()
+  }
+
+  const handleLimpiarFiltros = () => {
+    setFechaDesde('')
+    setFechaHasta('')
+    setTropaDesde('')
+    setTropaHasta('')
+    setUsuario('')
+    setProveedor('')
+    // Limpia y recarga sin filtros
+    setTimeout(() => {
+      fetchRindes()
+    }, 0)
   }
 
   const fetchDetalleTropa = async (tropaCodigo: string) => {
@@ -128,7 +160,6 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
     setDialogOpen(true)
     
     try {
-      // Buscar tropa por código
       const tropaRes = await fetch(`/api/tropas`)
       const tropaData = await tropaRes.json()
       const tropa = tropaData.data?.find((t: { codigo: string }) => t.codigo === tropaCodigo)
@@ -196,6 +227,132 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
     })
   }
 
+  // ==================== EXPORTACIONES ====================
+
+  const exportMainTableExcel = () => {
+    const headers = ['Tropa', 'Productor', 'Usuario Faena', 'Animales', 'Peso Vivo (kg)', 'Peso Faena (kg)', 'Rinde %', 'Rinde Mín. %', 'Rinde Máx. %']
+    const data = ordenarRindes(rindes).map(r => [
+      r.tropaCodigo,
+      r.productor || '-',
+      r.usuario || '-',
+      r.cantidadAnimales,
+      Math.round(r.pesoVivoTotal),
+      Math.round(r.pesoFaenaTotal),
+      r.rindePromedio.toFixed(2),
+      r.rindeMinimo > 0 ? r.rindeMinimo.toFixed(2) : '-',
+      r.rindeMaximo > 0 ? r.rindeMaximo.toFixed(2) : '-',
+    ])
+
+    // Agregar fila de totales
+    if (estadisticas) {
+      data.push([
+        '', 'TOTALES', '', estadisticas.totalAnimales,
+        Math.round(estadisticas.totalPesoVivo),
+        Math.round(estadisticas.totalPesoFaena),
+        estadisticas.rindeGeneral.toFixed(2), '', '',
+      ])
+    }
+
+    ExcelExporter.exportToExcel({
+      filename: `rindes_por_tropa_${new Date().toISOString().split('T')[0]}`,
+      sheets: [{ name: 'Rindes por Tropa', headers, data }],
+      title: 'Reporte de Rindes por Tropa - Solemar Alimentaria',
+    })
+
+    toast.success('Exportación Excel iniciada')
+  }
+
+  const exportMainTablePDF = () => {
+    const headers = ['Tropa', 'Productor', 'Usuario', 'Anim.', 'P. Vivo', 'P. Faena', 'Rinde %']
+    const data = ordenarRindes(rindes).map(r => [
+      r.tropaCodigo,
+      (r.productor || '-').substring(0, 20),
+      (r.usuario || '-').substring(0, 20),
+      r.cantidadAnimales.toString(),
+      formatNumber(Math.round(r.pesoVivoTotal)),
+      formatNumber(Math.round(r.pesoFaenaTotal)),
+      `${r.rindePromedio.toFixed(2)}%`,
+    ])
+
+    const doc = PDFExporter.generateReport({
+      title: 'Reporte de Rindes por Tropa',
+      subtitle: estadisticas 
+        ? `${estadisticas.totalTropas} tropas | ${formatNumber(estadisticas.totalAnimales)} animales | Rinde general: ${estadisticas.rindeGeneral.toFixed(2)}%`
+        : undefined,
+      headers,
+      data,
+      orientation: 'landscape',
+      fileName: `rindes_por_tropa_${new Date().toISOString().split('T')[0]}.pdf`,
+    })
+
+    PDFExporter.downloadPDF(doc, `rindes_por_tropa_${new Date().toISOString().split('T')[0]}.pdf`)
+    toast.success('Exportación PDF iniciada')
+  }
+
+  const exportDetalleExcel = () => {
+    if (!tropaDetalle) return
+
+    const headers = ['Garrón', 'Animal', 'Tipo', 'Peso Vivo (kg)', 'Media Izq (kg)', 'Media Der (kg)', 'Total (kg)', 'Rinde %']
+    const data = tropaDetalle.romaneos.map(r => [
+      r.garron,
+      r.numeroAnimal || '-',
+      r.tipoAnimal || '-',
+      r.pesoVivo ? Math.round(r.pesoVivo) : '-',
+      r.pesoMediaIzq ? r.pesoMediaIzq.toFixed(1) : '-',
+      r.pesoMediaDer ? r.pesoMediaDer.toFixed(1) : '-',
+      r.pesoTotal ? r.pesoTotal.toFixed(1) : '-',
+      r.rinde ? (r.rinde * 100).toFixed(2) : '-',
+    ])
+
+    // Agregar fila de totales
+    const stats = tropaDetalle.estadisticas
+    data.push([
+      '', 'TOTALES', '', 
+      Math.round(stats.pesoVivoTotal), '', '',
+      Math.round(stats.pesoFaenaTotal),
+      `${stats.rindePromedio.toFixed(2)}%`,
+    ])
+
+    ExcelExporter.exportToExcel({
+      filename: `detalle_tropa_${tropaDetalle.tropa?.codigo || 'desconocida'}_${new Date().toISOString().split('T')[0]}`,
+      sheets: [{ name: 'Detalle Animales', headers, data }],
+      title: `Detalle de Tropa ${tropaDetalle.tropa?.codigo} - Productor: ${tropaDetalle.tropa?.productor?.nombre || '-'}`,
+    })
+
+    toast.success('Exportación Excel del detalle iniciada')
+  }
+
+  const exportDetallePDF = () => {
+    if (!tropaDetalle) return
+
+    const headers = ['Garrón', 'Animal', 'Tipo', 'P. Vivo', 'Med. Izq', 'Med. Der', 'Total', 'Rinde']
+    const data = tropaDetalle.romaneos.map(r => [
+      r.garron.toString(),
+      (r.numeroAnimal || '-').toString(),
+      r.tipoAnimal || '-',
+      r.pesoVivo ? Math.round(r.pesoVivo).toString() : '-',
+      r.pesoMediaIzq ? r.pesoMediaIzq.toFixed(1) : '-',
+      r.pesoMediaDer ? r.pesoMediaDer.toFixed(1) : '-',
+      r.pesoTotal ? r.pesoTotal.toFixed(1) : '-',
+      r.rinde ? `${(r.rinde * 100).toFixed(2)}%` : '-',
+    ])
+
+    const stats = tropaDetalle.estadisticas
+    const doc = PDFExporter.generateReport({
+      title: `Detalle de Tropa ${tropaDetalle.tropa?.codigo || ''}`,
+      subtitle: `Productor: ${tropaDetalle.tropa?.productor?.nombre || '-'} | Animales: ${stats.cantidadAnimales} | Rinde: ${stats.rindePromedio.toFixed(2)}%`,
+      headers,
+      data,
+      orientation: 'landscape',
+      fileName: `detalle_tropa_${tropaDetalle.tropa?.codigo || 'desconocida'}.pdf`,
+    })
+
+    PDFExporter.downloadPDF(doc, `detalle_tropa_${tropaDetalle.tropa?.codigo || 'desconocida'}.pdf`)
+    toast.success('Exportación PDF del detalle iniciada')
+  }
+
+  const tieneFiltrosActivos = fechaDesde || fechaHasta || tropaDesde || tropaHasta || usuario || proveedor
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -203,7 +360,7 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
         <div>
           <p className="text-stone-500">Análisis de rendimiento por tropa faenada</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button 
             variant="outline" 
             size="sm" 
@@ -211,7 +368,22 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
           >
             <Filter className="w-4 h-4 mr-2" />
             Filtros
+            {tieneFiltrosActivos && (
+              <span className="ml-1.5 w-2 h-2 bg-amber-500 rounded-full" />
+            )}
           </Button>
+          {rindes.length > 0 && (
+            <>
+              <Button variant="outline" size="sm" onClick={exportMainTableExcel}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportMainTablePDF}>
+                <FileText className="w-4 h-4 mr-2" />
+                PDF
+              </Button>
+            </>
+          )}
           <Button 
             size="sm" 
             onClick={fetchRindes}
@@ -227,7 +399,7 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
       {mostrarFiltros && (
         <Card className="border-0 shadow-md">
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Fecha Desde</Label>
                 <Input
@@ -244,14 +416,62 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
                   onChange={(e) => setFechaHasta(e.target.value)}
                 />
               </div>
-              <div className="flex items-end">
-                <Button 
-                  variant="outline" 
-                  onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
-                >
-                  Limpiar filtros
-                </Button>
+              <div className="space-y-2">
+                <Label>Tropa Desde</Label>
+                <Input
+                  type="number"
+                  placeholder="Ej: 100"
+                  value={tropaDesde}
+                  onChange={(e) => setTropaDesde(e.target.value)}
+                  min={1}
+                />
               </div>
+              <div className="space-y-2">
+                <Label>Tropa Hasta</Label>
+                <Input
+                  type="number"
+                  placeholder="Ej: 179"
+                  value={tropaHasta}
+                  onChange={(e) => setTropaHasta(e.target.value)}
+                  min={1}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="space-y-2">
+                <Label>Usuario Faena</Label>
+                <Input
+                  type="text"
+                  placeholder="Buscar por nombre de usuario..."
+                  value={usuario}
+                  onChange={(e) => setUsuario(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Productor</Label>
+                <Input
+                  type="text"
+                  placeholder="Buscar por nombre de productor..."
+                  value={proveedor}
+                  onChange={(e) => setProveedor(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4 justify-end">
+              <Button 
+                variant="outline" 
+                onClick={handleLimpiarFiltros}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Limpiar
+              </Button>
+              <Button 
+                onClick={handleBuscar}
+                disabled={loading}
+              >
+                <Search className="w-4 h-4 mr-2" />
+                Buscar
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -339,7 +559,10 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
         <CardHeader>
           <CardTitle className="text-lg">Rindes por Tropa</CardTitle>
           <CardDescription>
-            Ordenado por rinde promedio (mayor a menor)
+            {tieneFiltrosActivos 
+              ? `Mostrando ${rindes.length} tropas con filtros aplicados`
+              : 'Ordenado por rinde promedio (mayor a menor)'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -352,7 +575,10 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
               <AlertCircle className="w-12 h-12 mx-auto mb-4 text-stone-300" />
               <p className="text-stone-500">No hay datos de rindes disponibles</p>
               <p className="text-sm text-stone-400 mt-2">
-                Los rindes se calculan a partir de los romaneos confirmados
+                {tieneFiltrosActivos 
+                  ? 'Intenta cambiar los filtros de búsqueda'
+                  : 'Los rindes se calculan a partir de los romaneos confirmados'
+                }
               </p>
             </div>
           ) : (
@@ -371,6 +597,8 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
                         )}
                       </div>
                     </TableHead>
+                    <TableHead>Productor</TableHead>
+                    <TableHead>Usuario</TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-stone-50 text-center"
                       onClick={() => toggleOrden('cantidadAnimales')}
@@ -404,6 +632,12 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
                     <TableRow key={rinde.tropaCodigo} className="hover:bg-stone-50">
                       <TableCell className="font-medium">
                         {rinde.tropaCodigo}
+                      </TableCell>
+                      <TableCell className="text-sm text-stone-600 max-w-[150px] truncate">
+                        {rinde.productor || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm text-stone-600 max-w-[150px] truncate">
+                        {rinde.usuario || '-'}
                       </TableCell>
                       <TableCell className="text-center">
                         {formatNumber(rinde.cantidadAnimales)}
@@ -455,10 +689,28 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
               Detalle de Tropa {tropaDetalle?.tropa?.codigo}
             </DialogTitle>
             <DialogDescription>
-              {tropaDetalle?.tropa?.productor?.nombre && (
-                <span>Productor: {tropaDetalle.tropa.productor.nombre}</span>
-              )}
+              <div className="space-y-1">
+                {tropaDetalle?.tropa?.productor?.nombre && (
+                  <p>Productor: {tropaDetalle.tropa.productor.nombre}</p>
+                )}
+                {tropaDetalle?.tropa?.usuarioFaena?.nombre && (
+                  <p>Usuario Faena: {tropaDetalle.tropa.usuarioFaena.nombre}</p>
+                )}
+              </div>
             </DialogDescription>
+            {/* Botones de exportación en el detalle */}
+            {tropaDetalle && !detalleLoading && (
+              <div className="flex gap-2 mt-2">
+                <Button variant="outline" size="sm" onClick={exportDetalleExcel}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Exportar Excel
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportDetallePDF}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Exportar PDF
+                </Button>
+              </div>
+            )}
           </DialogHeader>
 
           {detalleLoading ? (
@@ -522,13 +774,13 @@ function RindesTropaModule({ operador }: { operador: Operador }) {
                         <TableCell>{romaneo.numeroAnimal || '-'}</TableCell>
                         <TableCell>{romaneo.tipoAnimal || '-'}</TableCell>
                         <TableCell className="text-right">{romaneo.pesoVivo ? formatNumber(romaneo.pesoVivo) : '-'}</TableCell>
-                        <TableCell className="text-right">{romaneo.pesoMediaIzq ? formatNumber(romaneo.pesoMediaIzq) : '-'}</TableCell>
-                        <TableCell className="text-right">{romaneo.pesoMediaDer ? formatNumber(romaneo.pesoMediaDer) : '-'}</TableCell>
-                        <TableCell className="text-right font-medium">{romaneo.pesoTotal ? formatNumber(romaneo.pesoTotal) : '-'}</TableCell>
+                        <TableCell className="text-right">{romaneo.pesoMediaIzq ? formatNumber(romaneo.pesoMediaIzq, 1) : '-'}</TableCell>
+                        <TableCell className="text-right">{romaneo.pesoMediaDer ? formatNumber(romaneo.pesoMediaDer, 1) : '-'}</TableCell>
+                        <TableCell className="text-right font-medium">{romaneo.pesoTotal ? formatNumber(romaneo.pesoTotal, 1) : '-'}</TableCell>
                         <TableCell className="text-right">
                           {romaneo.rinde ? (
-                            <Badge className={getRindeBadge(romaneo.rinde)}>
-                              {formatNumber(romaneo.rinde, 2)}%
+                            <Badge className={getRindeBadge(romaneo.rinde * 100)}>
+                              {formatNumber(romaneo.rinde * 100, 2)}%
                             </Badge>
                           ) : '-'}
                         </TableCell>

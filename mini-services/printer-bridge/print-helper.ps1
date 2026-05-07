@@ -23,7 +23,7 @@ try {
 using System;
 using System.Runtime.InteropServices;
 
-public class WinSpool
+public class WinSpoolBridge
 {
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct DOC_INFO_1
@@ -59,10 +59,13 @@ public class WinSpool
 }
 '@
 
-    Add-Type -TypeDefinition $code -Language CSharp | Out-Null
+    # Evitar error si el tipo ya fue cargado en esta sesion de PowerShell
+    if (-not ([System.Management.Automation.PSTypeName]'WinSpoolBridge').Type) {
+        Add-Type -TypeDefinition $code -Language CSharp | Out-Null
+    }
 
 } catch {
-    Write-Output "ERROR:Cargando Win32 API: $_"
+    Write-Output "ERROR:Cargando Win32 API: $($_.Exception.Message)"
     exit 1
 }
 
@@ -79,7 +82,7 @@ if ($fileSize -eq 0) {
     exit 1
 }
 
-$docInfo = New-Object WinSpool+DOC_INFO_1
+$docInfo = New-Object WinSpoolBridge+DOC_INFO_1
 $docInfo.pDocName = "PrinterBridge"
 $docInfo.pOutputFile = $null
 $docInfo.pDatatype = "RAW"
@@ -87,15 +90,22 @@ $docInfo.pDatatype = "RAW"
 $hPrinter = [IntPtr]::Zero
 
 # Abrir impresora
-$result = [WinSpool]::OpenPrinter($PrinterName, [ref]$hPrinter, [IntPtr]::Zero)
+$result = [WinSpoolBridge]::OpenPrinter($PrinterName, [ref]$hPrinter, [IntPtr]::Zero)
 if (-not $result) {
-    $errCode = [WinSpool]::GetLastError()
+    $errCode = [WinSpoolBridge]::GetLastError()
     $errMsg = switch ($errCode) {
-        5    { "Acceso denegado. Ejecuta como Administrador." }
-        1801 { "Impresora '$PrinterName' no encontrada. Verifica el nombre exacto." }
-        3015 { "La impresora esta pausada." }
-        13   { "Permiso insuficiente." }
-        2    { "Impresora no encontrada." }
+        5    { "Acceso denegado. Ejecuta el bridge como Administrador." }
+        1801 {
+            # Listar impresoras disponibles para ayudar al usuario
+            $available = (Get-Printer -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name) -join ", "
+            "Impresora '$PrinterName' no encontrada. Impresoras disponibles: $available"
+        }
+        3015 { "La impresora esta pausada. Reanudala desde Configuracion de impresion." }
+        13   { "Permiso insuficiente. Ejecuta como Administrador." }
+        2    {
+            $available = (Get-Printer -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name) -join ", "
+            "Impresora no encontrada: '$PrinterName'. Disponibles: $available"
+        }
         default { "Error de Windows $errCode al abrir impresora." }
     }
     Write-Output "ERROR:$errMsg (codigo: $errCode)"
@@ -107,35 +117,35 @@ try {
     $written = 0
 
     # Iniciar documento de impresion
-    $result = [WinSpool]::StartDocPrinter($hPrinter, 1, [ref]$docInfo)
+    $result = [WinSpoolBridge]::StartDocPrinter($hPrinter, 1, [ref]$docInfo)
     if (-not $result) {
-        $errCode = [WinSpool]::GetLastError()
+        $errCode = [WinSpoolBridge]::GetLastError()
         Write-Output "ERROR:StartDocPrinter fallo (codigo: $errCode)"
         exit 1
     }
 
     # Iniciar pagina
-    $result = [WinSpool]::StartPagePrinter($hPrinter)
+    $result = [WinSpoolBridge]::StartPagePrinter($hPrinter)
     if (-not $result) {
-        $errCode = [WinSpool]::GetLastError()
+        $errCode = [WinSpoolBridge]::GetLastError()
         Write-Output "ERROR:StartPagePrinter fallo (codigo: $errCode)"
-        [WinSpool]::EndDocPrinter($hPrinter) | Out-Null
+        [WinSpoolBridge]::EndDocPrinter($hPrinter) | Out-Null
         exit 1
     }
 
     # Escribir datos
-    $result = [WinSpool]::WritePrinter($hPrinter, $data, $data.Length, [ref]$written)
+    $result = [WinSpoolBridge]::WritePrinter($hPrinter, $data, $data.Length, [ref]$written)
     if (-not $result) {
-        $errCode = [WinSpool]::GetLastError()
+        $errCode = [WinSpoolBridge]::GetLastError()
         Write-Output "ERROR:WritePrinter fallo (codigo: $errCode)"
-        [WinSpool]::EndPagePrinter($hPrinter) | Out-Null
-        [WinSpool]::EndDocPrinter($hPrinter) | Out-Null
+        [WinSpoolBridge]::EndPagePrinter($hPrinter) | Out-Null
+        [WinSpoolBridge]::EndDocPrinter($hPrinter) | Out-Null
         exit 1
     }
 
     # Finalizar pagina y documento
-    [WinSpool]::EndPagePrinter($hPrinter) | Out-Null
-    [WinSpool]::EndDocPrinter($hPrinter) | Out-Null
+    [WinSpoolBridge]::EndPagePrinter($hPrinter) | Out-Null
+    [WinSpoolBridge]::EndDocPrinter($hPrinter) | Out-Null
 
     Write-Output "OK:$written"
 
@@ -143,6 +153,6 @@ try {
     Write-Output "ERROR:Excepcion: $($_.Exception.Message)"
 } finally {
     if ($hPrinter -ne [IntPtr]::Zero) {
-        [WinSpool]::ClosePrinter($hPrinter) | Out-Null
+        [WinSpoolBridge]::ClosePrinter($hPrinter) | Out-Null
     }
 }

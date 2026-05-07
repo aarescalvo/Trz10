@@ -139,27 +139,40 @@ function printRaw(printerName, data) {
       // Limpiar archivo temp
       try { fs.unlinkSync(tempFile) } catch {}
 
-      if (error) {
-        log('error', `Error ejecutando PowerShell: ${error.message}`)
-        resolve({ success: false, error: 'Error PowerShell: ' + error.message })
-        return
-      }
-
       const output = (stdout || '').trim()
+      const errOutput = (stderr || '').trim()
 
+      // El helper emite ERROR:xxx o OK:xxx por stdout.
+      // PowerShell puede salir con exit 1 pero aun asi tener stdout util.
+      // Priorizar el mensaje estructurado del helper.
       if (output.startsWith('OK:')) {
         const bytes = output.substring(3)
         log('info', `Impresion exitosa (${bytes} bytes)`)
         resolve({ success: true, bytesWritten: parseInt(bytes) })
-      } else if (output.startsWith('ERROR:')) {
+        return
+      }
+
+      if (output.startsWith('ERROR:')) {
         const errorMsg = output.substring(6)
         log('error', `Error de impresion: ${errorMsg}`)
         resolve({ success: false, error: errorMsg })
-      } else {
-        log('error', `Respuesta inesperada: ${output}`)
-        log('error', `stderr: ${stderr}`)
-        resolve({ success: false, error: 'Respuesta inesperada del helper: ' + output })
+        return
       }
+
+      // Si llegamos aca, no hubo respuesta estructurada
+      if (error) {
+        let detail = error.message || ''
+        if (errOutput) detail += ' | stderr: ' + errOutput
+        if (output) detail += ' | stdout: ' + output
+        log('error', `Error ejecutando PowerShell: ${detail}`)
+        resolve({ success: false, error: 'Error PowerShell: ' + detail })
+        return
+      }
+
+      // Sin error pero sin respuesta esperada
+      log('error', `Respuesta inesperada: ${output}`)
+      if (errOutput) log('error', `stderr: ${errOutput}`)
+      resolve({ success: false, error: 'Respuesta inesperada del helper: ' + output })
     })
   })
 }

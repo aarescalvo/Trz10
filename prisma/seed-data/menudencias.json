@@ -12283,5 +12283,680 @@
     "unidades": null,
     "kgDecomiso": null,
     "tipoMenudenciaNombre": "CARNE DE CABEZA (KG)"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 3,
+    "kg": 55.4,
+    "unidades": 3,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CHINCHULIN (KG)"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 5,
+    "kg": 28.0,
+    "unidades": 5,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CORAZON"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 2,
+    "kg": 0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "HIGADO"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 2,
+    "kg": 28.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "LENGUA"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 1,
+    "kg": 20.78,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "MOLLEJAS (KG)"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 2,
+    "kg": 56.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RIÑON"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 1,
+    "kg": 112.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TENDON"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 2,
+    "kg": 28.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TRIPA GORDA"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 1,
+    "kg": 28.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CENTRO DE ENTRAÑA"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 2,
+    "kg": 36.64,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "QUIJADA (KG)"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 2,
+    "kg": 28.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RABO"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 1,
+    "kg": 28.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "SESOS"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 1,
+    "kg": 12.82,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CARNE DE CABEZA (KG)"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 0,
+    "kg": 0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "4.65"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 0,
+    "kg": 0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "USUARIO"
+  },
+  {
+    "tropaNumero": 173,
+    "item": "",
+    "cantidad": 0,
+    "kg": 5.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "2defierro"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 19.2,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CHINCHULIN (KG)"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 10.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CORAZON"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 2,
+    "kg": 10.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "HIGADO"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 10.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "LENGUA"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 7.52,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "MOLLEJAS (KG)"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 20.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RIÑON"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 40.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TENDON"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 10.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TRIPA GORDA"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 10.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CENTRO DE ENTRAÑA"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 14.28,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "QUIJADA (KG)"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 10.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RABO"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 10.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "SESOS"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 1,
+    "kg": 4.78,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CARNE DE CABEZA (KG)"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 0,
+    "kg": 0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "0.98"
+  },
+  {
+    "tropaNumero": 174,
+    "item": "",
+    "cantidad": 0,
+    "kg": 0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "USUARIO"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 5,
+    "kg": 107.06,
+    "unidades": 5,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CHINCHULIN (KG)"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 2,
+    "kg": 35.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CORAZON"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 7,
+    "kg": 0,
+    "unidades": 7,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "HIGADO"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 2,
+    "kg": 35.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "LENGUA"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 2,
+    "kg": 30.84,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "MOLLEJAS (KG)"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 2,
+    "kg": 70.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RIÑON"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 1,
+    "kg": 140.0,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TENDON"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 3,
+    "kg": 35.0,
+    "unidades": 3,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TRIPA GORDA"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 2,
+    "kg": 35.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CENTRO DE ENTRAÑA"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 3,
+    "kg": 56.64,
+    "unidades": 3,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "QUIJADA (KG)"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 3,
+    "kg": 35.0,
+    "unidades": 3,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RABO"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 2,
+    "kg": 35.0,
+    "unidades": 2,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "SESOS"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 1,
+    "kg": 17.98,
+    "unidades": 1,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CARNE DE CABEZA (KG)"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 8,
+    "kg": 0,
+    "unidades": 8,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "163.20000000000002"
+  },
+  {
+    "tropaNumero": 175,
+    "item": "",
+    "cantidad": 0,
+    "kg": 0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "6.68"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 5.7,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CHINCHULIN (KG)"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 3.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CORAZON"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 3.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "HIGADO"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 3.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "LENGUA"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 1.78,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "MOLLEJAS (KG)"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 6.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RIÑON"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 12.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TENDON"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 3.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TRIPA GORDA"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 3.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CENTRO DE ENTRAÑA"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 300.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "QUIJADA (KG)"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 3.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RABO"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 3.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "SESOS"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 1.6,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CARNE DE CABEZA (KG)"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "1.48"
+  },
+  {
+    "tropaNumero": 176,
+    "item": "",
+    "cantidad": 0,
+    "kg": 0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "USUARIO"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 5.2,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CHINCHULIN (KG)"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 2.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CORAZON"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 2.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "HIGADO"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 2.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "LENGUA"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 1.7,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "MOLLEJAS (KG)"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 4.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RIÑON"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 8.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TENDON"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 2.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "TRIPA GORDA"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 2.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CENTRO DE ENTRAÑA"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 2.64,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "QUIJADA (KG)"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 2.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "RABO"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 2.0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "SESOS"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 9.58,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "CARNE DE CABEZA (KG)"
+  },
+  {
+    "tropaNumero": 177,
+    "item": "",
+    "cantidad": 0,
+    "kg": 0,
+    "unidades": 0,
+    "kgDecomiso": 0,
+    "tipoMenudenciaNombre": "1.4"
   }
 ]

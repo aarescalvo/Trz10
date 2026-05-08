@@ -822,43 +822,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 ).format(fecha=now)
             else:
                 # Etiqueta de prueba DPL (compatible Datamax Mark II)
-                # STX = 0x02 (inicio), ETX = 0x03 (fin) - caracteres de control reales
+                # STX = 0x02 (inicio), ETX = 0x03 (fin)
+                # Comando T: T,X,Y,font,height,width,style,"TEXT"
+                # Mismo formato que los rotulos del sistema TrazAlan
                 test_data = (
                     "\x02L\n"
                     "D11\n"
-                    "H14\n"
-                    "PG\n"
-                    "\n"
-                    "1K0250\n"
-                    "1V0010\n"
-                    "2f250\n"
-                    "3c0000\n"
-                    "eSOLEMAR ALIMENTARIA\n"
-                    "\n"
-                    "1K0180\n"
-                    "1V0060\n"
-                    "2f350\n"
-                    "3c0000\n"
-                    "e** PRUEBA **\n"
-                    "\n"
-                    "1K0140\n"
-                    "1V0130\n"
-                    "2f180\n"
-                    "3c0000\n"
-                    "ePrinter Bridge v3.0\n"
-                    "\n"
-                    "1K0140\n"
-                    "1V0190\n"
-                    "2f160\n"
-                    "3c0000\n"
-                    "e" + now + "\n"
-                    "\n"
-                    "1K0140\n"
-                    "1V0250\n"
-                    "2f180\n"
-                    "3c0000\n"
-                    "eDatamax Mark II\n"
-                    "\n"
+                    "H0030\n"
+                    "T10,10,3,60,40,N,\"SOLEMAR ALIMENTARIA\"\n"
+                    "T10,80,3,40,30,N,\"** PRUEBA **\"\n"
+                    "T10,140,3,30,20,N,\"Printer Bridge v3.0\"\n"
+                    "T10,190,3,30,20,N,\"Datamax Mark II\"\n"
+                    "T10,240,3,20,15,N,\"" + now + "\"\n"
                     "\x03E"
                 )
 

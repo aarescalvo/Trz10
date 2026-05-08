@@ -224,97 +224,118 @@ def get_printer_port(printer_name):
 
 def print_raw(printer_name, data):
     """
-    Enviar datos RAW a la impresora via Win32 Spooler API.
+    Imprimir datos en la impresora Datamax via archivo .itf temporal.
+
+    La Datamax M-4206 usa archivos .itf (Intelligent Tag Format) que contienen
+    comandos DPL. Se escribe un archivo .itf temporal y se imprime usando el
+    driver de Windows (metodo del sistema viejo de trazabilidad).
 
     Args:
         printer_name: Nombre exacto de la impresora en Windows
-        data: bytes o str con los datos (ZPL/DPL) a imprimir
+        data: bytes o str con los datos (DPL) a imprimir
 
     Returns:
-        dict con {success: bool, bytes_written: int, error: str}
+        dict con {success: bool, bytes_written: int, error: str, method: str}
     """
-    win32print = try_import_win32print()
-
-    if not win32print:
-        return {
-            'success': False,
-            'error': 'pywin32 no esta instalado. Ejecuta: pip install pywin32'
-        }
+    import uuid
 
     if isinstance(data, str):
-        # Codificar como latin-1 (preserva bytes 0x80-0xFF de ZPL/DPL)
         data = data.encode('latin-1', errors='replace')
 
     if len(data) == 0:
         return {'success': False, 'error': 'Datos vacios'}
 
+    # Generar archivo .itf temporal
+    job_id = uuid.uuid4().hex[:8]
+    filename = 'print-job-{}.itf'.format(job_id)
+    filepath = os.path.join(TEMP_DIR, filename)
+
     try:
-        # Abrir impresora
-        hPrinter = win32print.OpenPrinter(printer_name)
+        with open(filepath, 'wb') as f:
+            f.write(data)
+        log('debug', 'Archivo ITF creado: {} ({} bytes)'.format(filepath, len(data)))
+    except Exception as e:
+        log('error', 'Error creando archivo ITF: {}'.format(e))
+        return {'success': False, 'error': 'Error creando archivo temporal: {}'.format(e)}
 
+    # === METODO 1: os.startfile (usa la asociacion de .itf con el driver) ===
+    try:
+        os.startfile(filepath, 'print')
+        log('info', 'Impresion OK (startfile) - {} bytes -> "{}"'.format(len(data), printer_name))
+        return {'success': True, 'bytes_written': len(data), 'method': 'startfile'}
+    except Exception as e:
+        log('debug', 'startfile fallo: {}'.format(e))
+
+    # === METODO 2: comando PRINT de Windows ===
+    try:
+        result = subprocess.run(
+            ['print', '/D:"{}"'.format(printer_name), filepath],
+            shell=True, capture_output=True, timeout=30
+        )
+        if result.returncode == 0:
+            log('info', 'Impresion OK (print cmd) - {} bytes -> "{}"'.format(len(data), printer_name))
+            return {'success': True, 'bytes_written': len(data), 'method': 'print_cmd'}
+        else:
+            log('debug', 'print cmd retorno {}: {}'.format(result.returncode, result.stderr.decode('mbcs', errors='replace')))
+    except Exception as e:
+        log('debug', 'print cmd fallo: {}'.format(e))
+
+    # === METODO 3: PowerShell Out-Printer ===
+    try:
+        ps_cmd = 'Get-Content -Path "{}" -Raw | Out-Printer -Name "{}"'.format(filepath, printer_name)
+        result = subprocess.run(
+            ['powershell', '-NoProfile', '-Command', ps_cmd],
+            capture_output=True, timeout=30
+        )
+        if result.returncode == 0:
+            log('info', 'Impresion OK (PowerShell) - {} bytes -> "{}"'.format(len(data), printer_name))
+            return {'success': True, 'bytes_written': len(data), 'method': 'powershell'}
+        else:
+            log('debug', 'PowerShell retorno {}'.format(result.returncode))
+    except Exception as e:
+        log('debug', 'PowerShell fallo: {}'.format(e))
+
+    # === METODO 4: win32print RAW (fallback directo) ===
+    win32print = try_import_win32print()
+    if win32print:
         try:
-            # Informacion del documento (formato DOC_INFO_1)
-            # pywin32 moderno requiere strings Unicode, no bytes
-            docInfo = ['PrinterBridge', None, 'RAW']
-            win32print.StartDocPrinter(hPrinter, 1, docInfo)
-
+            hPrinter = win32print.OpenPrinter(printer_name)
             try:
-                # Iniciar pagina
-                win32print.StartPagePrinter(hPrinter)
-
+                docInfo = ['PrinterBridge', None, 'RAW']
+                win32print.StartDocPrinter(hPrinter, 1, docInfo)
                 try:
-                    # Escribir datos
-                    written = win32print.WritePrinter(hPrinter, data)
-
-                    # Finalizar pagina y documento
-                    win32print.EndPagePrinter(hPrinter)
-                    win32print.EndDocPrinter(hPrinter)
-
-                    log('info', 'Impresion OK - {} bytes -> "{}"'.format(written, printer_name))
-
-                    return {
-                        'success': True,
-                        'bytes_written': written
-                    }
-
-                except Exception as e:
+                    win32print.StartPagePrinter(hPrinter)
                     try:
+                        with open(filepath, 'rb') as f:
+                            file_data = f.read()
+                        written = win32print.WritePrinter(hPrinter, file_data)
                         win32print.EndPagePrinter(hPrinter)
+                        win32print.EndDocPrinter(hPrinter)
+                        log('info', 'Impresion OK (win32print RAW) - {} bytes -> "{}"'.format(written, printer_name))
+                        return {'success': True, 'bytes_written': written, 'method': 'win32print'}
+                    except Exception as e2:
+                        try:
+                            win32print.EndPagePrinter(hPrinter)
+                        except:
+                            pass
+                        raise e2
+                except Exception as e2:
+                    try:
+                        win32print.EndDocPrinter(hPrinter)
                     except:
                         pass
-                    raise e
+                    raise e2
+            finally:
+                win32print.ClosePrinter(hPrinter)
+        except Exception as e:
+            log('debug', 'win32print RAW fallo: {}'.format(e))
 
-            except Exception as e:
-                try:
-                    win32print.EndDocPrinter(hPrinter)
-                except:
-                    pass
-                raise e
-
-        finally:
-            win32print.ClosePrinter(hPrinter)
-
-    except Exception as e:
-        err_msg = str(e)
-        # Interpretar errores comunes de Windows
-        err_code = None
-        if hasattr(e, 'winerror'):
-            err_code = e.winerror
-        elif hasattr(e, 'args') and len(e.args) > 0:
-            err_code = e.args[0] if isinstance(e.args[0], int) else None
-
-        if err_code == 5:
-            err_msg = 'Acceso denegado. Ejecuta como Administrador.'
-        elif err_code in (1801, 2):
-            err_msg = 'Impresora "{}" no encontrada. Verifica el nombre exacto.'.format(printer_name)
-        elif err_code == 3015:
-            err_msg = 'La impresora esta pausada.'
-
-        log('error', 'Error imprimiendo: {}'.format(err_msg))
-        return {
-            'success': False,
-            'error': err_msg
-        }
+    # Ningun metodo funciono
+    log('error', 'Todos los metodos de impresion fallaron')
+    return {
+        'success': False,
+        'error': 'No se pudo imprimir. Verifica que el driver Datamax este instalado y la impresora encendida.'
+    }
 
 
 # ============================================================
@@ -822,7 +843,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 ).format(fecha=now)
             else:
                 # Etiqueta de prueba DPL - Formato exacto del sistema viejo de trazabilidad
-                # SIN caracteres de control STX/ETX (el spooler de Windows los filtra)
+                # Basado en ANIMAL INDIVIDUAL.itf comprobado que funciona
                 test_data = (
                     "M1084\n"
                     "O0220\n"
@@ -833,6 +854,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     "PO\n"
                     "pG\n"
                     "SO\n"
+                    "A2\n"
+                    "1e8406900410065Ccb\n"
+                    "ySE1\n"
                     "1911A1200220110SOLEMAR ALIMENTARIA\n"
                     "1911A1200550110** PRUEBA **\n"
                     "1911A1200880110Printer Bridge v3.0\n"

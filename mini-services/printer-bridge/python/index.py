@@ -134,17 +134,33 @@ def list_printers():
             printers = []
             flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
             for printer_info in win32print.EnumPrinters(flags, None, 2):
-                # pywin32 EnumPrinters(level=2) retorna 5 valores:
-                # (Flags, pDescription, pName, pComment, pStatus)
-                # Pero algunas versiones retornan diferente cantidad
-                info_tuple = tuple(printer_info)
-                pName = info_tuple[2] if len(info_tuple) > 2 else ''
-                pDesc = info_tuple[1] if len(info_tuple) > 1 else pName
-                printers.append({
-                    'name': pName,
-                    'description': pDesc,
-                    'port': ''
-                })
+                # pywin32 EnumPrinters(level=2) retorna formatos distintos segun version:
+                #
+                # Formato simple (versiones antiguas): 5 valores
+                #   (Flags, pDescription, pName, pComment, pStatus)
+                #
+                # Formato PRINTER_INFO_2 completo (versiones nuevas): 21 valores
+                #   [0] pServerName, [1] pPrinterName, [2] pShareName,
+                #   [3] pPortName, [4] pDriverName, [5] pComment, ...
+                info = tuple(printer_info)
+
+                if len(info) <= 5:
+                    # Formato simple
+                    pName = info[2] if len(info) > 2 else ''
+                    pDesc = info[1] if len(info) > 1 else pName
+                    pPort = ''
+                else:
+                    # Formato PRINTER_INFO_2 completo
+                    pName = info[1]   # pPrinterName
+                    pDesc = info[5] if len(info) > 5 and info[5] else info[4]  # pComment o pDriverName
+                    pPort = info[3]   # pPortName (ej: USB001)
+
+                if pName:
+                    printers.append({
+                        'name': pName,
+                        'description': pDesc,
+                        'port': pPort
+                    })
             return printers
         except Exception as e:
             log('error', 'Error listando impresoras con win32print: {}'.format(e))

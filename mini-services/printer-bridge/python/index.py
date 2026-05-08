@@ -126,6 +126,15 @@ def try_import_win32print():
         return None
 
 
+def pywintypes_error():
+    """Intentar obtener pywintypes.error para except clauses."""
+    try:
+        import pywintypes
+        return pywintypes.error
+    except ImportError:
+        return TypeError
+
+
 def list_printers():
     """Listar impresoras instaladas en Windows."""
     printers = []
@@ -244,16 +253,16 @@ def print_raw(printer_name, data):
         hPrinter = win32print.OpenPrinter(printer_name)
 
         try:
-            # Informacion del documento (formato DOC_INFO_1: lista de 3 elementos)
-            # Algunas versiones de pywin32 requieren lista, otras aceptan dict
-            docInfo = [
-                b'PrinterBridge',  # pDocName
-                None,               # pOutputFile
-                b'RAW'              # pDatatype
-            ]
-
-            # Iniciar documento
-            win32print.StartDocPrinter(hPrinter, 1, docInfo)
+            # Informacion del documento (formato DOC_INFO_1)
+            # Algunas versiones de pywin32 aceptan bytes, otras requieren strings
+            try:
+                # Intentar con bytes primero (pywin32 viejo)
+                docInfo = [b'PrinterBridge', None, b'RAW']
+                win32print.StartDocPrinter(hPrinter, 1, docInfo)
+            except (TypeError, pywintypes_error):
+                # Fallback con strings Unicode (pywin32 nuevo)
+                docInfo = ['PrinterBridge', None, 'RAW']
+                win32print.StartDocPrinter(hPrinter, 1, docInfo)
 
             try:
                 # Iniciar pagina

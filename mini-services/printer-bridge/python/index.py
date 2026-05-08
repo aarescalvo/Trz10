@@ -254,15 +254,9 @@ def print_raw(printer_name, data):
 
         try:
             # Informacion del documento (formato DOC_INFO_1)
-            # Algunas versiones de pywin32 aceptan bytes, otras requieren strings
-            try:
-                # Intentar con bytes primero (pywin32 viejo)
-                docInfo = [b'PrinterBridge', None, b'RAW']
-                win32print.StartDocPrinter(hPrinter, 1, docInfo)
-            except (TypeError, pywintypes_error):
-                # Fallback con strings Unicode (pywin32 nuevo)
-                docInfo = ['PrinterBridge', None, 'RAW']
-                win32print.StartDocPrinter(hPrinter, 1, docInfo)
+            # pywin32 moderno requiere strings Unicode, no bytes
+            docInfo = ['PrinterBridge', None, 'RAW']
+            win32print.StartDocPrinter(hPrinter, 1, docInfo)
 
             try:
                 # Iniciar pagina

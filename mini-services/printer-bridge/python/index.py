@@ -224,11 +224,13 @@ def get_printer_port(printer_name):
 
 def print_raw(printer_name, data):
     """
-    Imprimir datos en la impresora Datamax via archivo .itf temporal.
+    Imprimir datos DPL en la impresora Datamax.
 
-    La Datamax M-4206 usa archivos .itf (Intelligent Tag Format) que contienen
-    comandos DPL. Se escribe un archivo .itf temporal y se imprime usando el
-    driver de Windows (metodo del sistema viejo de trazabilidad).
+    Estrategia:
+    1. Escribir datos a archivo .itf temporal
+    2. Enviar via win32print RAW (bytes directos al printer spooler)
+    3. Fallback: os.startfile (usa asociacion .itf con driver)
+    4. Fallback: PowerShell
 
     Args:
         printer_name: Nombre exacto de la impresora en Windows
@@ -258,44 +260,7 @@ def print_raw(printer_name, data):
         log('error', 'Error creando archivo ITF: {}'.format(e))
         return {'success': False, 'error': 'Error creando archivo temporal: {}'.format(e)}
 
-    # === METODO 1: os.startfile (usa la asociacion de .itf con el driver) ===
-    try:
-        os.startfile(filepath, 'print')
-        log('info', 'Impresion OK (startfile) - {} bytes -> "{}"'.format(len(data), printer_name))
-        return {'success': True, 'bytes_written': len(data), 'method': 'startfile'}
-    except Exception as e:
-        log('debug', 'startfile fallo: {}'.format(e))
-
-    # === METODO 2: comando PRINT de Windows ===
-    try:
-        result = subprocess.run(
-            ['print', '/D:"{}"'.format(printer_name), filepath],
-            shell=True, capture_output=True, timeout=30
-        )
-        if result.returncode == 0:
-            log('info', 'Impresion OK (print cmd) - {} bytes -> "{}"'.format(len(data), printer_name))
-            return {'success': True, 'bytes_written': len(data), 'method': 'print_cmd'}
-        else:
-            log('debug', 'print cmd retorno {}: {}'.format(result.returncode, result.stderr.decode('mbcs', errors='replace')))
-    except Exception as e:
-        log('debug', 'print cmd fallo: {}'.format(e))
-
-    # === METODO 3: PowerShell Out-Printer ===
-    try:
-        ps_cmd = 'Get-Content -Path "{}" -Raw | Out-Printer -Name "{}"'.format(filepath, printer_name)
-        result = subprocess.run(
-            ['powershell', '-NoProfile', '-Command', ps_cmd],
-            capture_output=True, timeout=30
-        )
-        if result.returncode == 0:
-            log('info', 'Impresion OK (PowerShell) - {} bytes -> "{}"'.format(len(data), printer_name))
-            return {'success': True, 'bytes_written': len(data), 'method': 'powershell'}
-        else:
-            log('debug', 'PowerShell retorno {}'.format(result.returncode))
-    except Exception as e:
-        log('debug', 'PowerShell fallo: {}'.format(e))
-
-    # === METODO 4: win32print RAW (fallback directo) ===
+    # === METODO 1: win32print RAW (bytes directos, sin procesar por driver) ===
     win32print = try_import_win32print()
     if win32print:
         try:
@@ -306,6 +271,7 @@ def print_raw(printer_name, data):
                 try:
                     win32print.StartPagePrinter(hPrinter)
                     try:
+                        # Leer el archivo y enviar como bytes RAW
                         with open(filepath, 'rb') as f:
                             file_data = f.read()
                         written = win32print.WritePrinter(hPrinter, file_data)
@@ -318,6 +284,7 @@ def print_raw(printer_name, data):
                             win32print.EndPagePrinter(hPrinter)
                         except:
                             pass
+                        log('error', 'win32print WritePrinter fallo: {}'.format(e2))
                         raise e2
                 except Exception as e2:
                     try:
@@ -329,6 +296,30 @@ def print_raw(printer_name, data):
                 win32print.ClosePrinter(hPrinter)
         except Exception as e:
             log('debug', 'win32print RAW fallo: {}'.format(e))
+
+    # === METODO 2: os.startfile (usa la asociacion de .itf con el driver) ===
+    try:
+        os.startfile(filepath, 'print')
+        log('info', 'Impresion OK (startfile) - {} bytes -> "{}"'.format(len(data), printer_name))
+        return {'success': True, 'bytes_written': len(data), 'method': 'startfile'}
+    except Exception as e:
+        log('debug', 'startfile fallo: {}'.format(e))
+
+    # === METODO 3: PowerShell (envia archivo al spooler) ===
+    try:
+        # Leer archivo y enviar como bytes via PowerShell al puerto de la impresora
+        ps_cmd = (
+            'Start-Process -FilePath "{}" -Verb Print -PassThru | Wait-Process'.format(filepath)
+        )
+        result = subprocess.run(
+            ['powershell', '-NoProfile', '-Command', ps_cmd],
+            capture_output=True, timeout=30
+        )
+        if result.returncode == 0:
+            log('info', 'Impresion OK (PowerShell Start-Process) - {} bytes'.format(len(data)))
+            return {'success': True, 'bytes_written': len(data), 'method': 'powershell'}
+    except Exception as e:
+        log('debug', 'PowerShell fallo: {}'.format(e))
 
     # Ningun metodo funciono
     log('error', 'Todos los metodos de impresion fallaron')

@@ -1224,6 +1224,15 @@ model Factura {
   condicionVenta    String?       // Contado, Cuenta Corriente, etc.
   remito            String?       // N° de remito asociado
   
+  // AFIP
+  tipoComprobante   TipoComprobante?  // Tipo de comprobante AFIP (A, B, C, etc.)
+  puntoVenta        Int?          // Punto de venta (1-9999)
+  numeroComprobante String?       // Número de comprobante AFIP
+  cae               String?       // Código de Autorización Electrónico
+  caeVencimiento    DateTime?     // Vencimiento del CAE (fechaVencimientoCAE en código)
+  fechaEmisionAFIP  DateTime?     // Fecha de emisión en AFIP
+  qrData            String?       // Datos QR para comprobante
+  
   // Operador
   operadorId        String?
   operador          Operador?     @relation(fields: [operadorId], references: [id])

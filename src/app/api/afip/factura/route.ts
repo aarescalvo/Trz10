@@ -382,7 +382,7 @@ export async function POST(request: NextRequest) {
         tipoComprobante: tipoComprobante as unknown as import('@prisma/client').TipoComprobante,
         numeroComprobante: numeroComprobanteStr,
         cae,
-        fechaVencimientoCAE,
+        caeVencimiento: fechaVencimientoCAE,
         fechaEmisionAFIP: new Date(),
         qrData,
         estado: 'EMITIDA',
@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
         tipoComprobante: facturaActualizada.tipoComprobante,
         numeroComprobante: facturaActualizada.numeroComprobante,
         cae: facturaActualizada.cae,
-        fechaVencimientoCAE: facturaActualizada.fechaVencimientoCAE,
+        fechaVencimientoCAE: facturaActualizada.caeVencimiento,
         fechaEmisionAFIP: facturaActualizada.fechaEmisionAFIP,
         qrData: facturaActualizada.qrData,
         ambiente: config.ambiente
@@ -470,8 +470,8 @@ export async function PUT(request: NextRequest) {
     }
     
     // Verificar estado del CAE
-    const caeValido = factura.cae && factura.fechaVencimientoCAE && 
-      new Date(factura.fechaVencimientoCAE) > new Date()
+    const caeValido = factura.cae && factura.caeVencimiento && 
+      new Date(factura.caeVencimiento) > new Date()
     
     return NextResponse.json({
       success: true,
@@ -482,7 +482,7 @@ export async function PUT(request: NextRequest) {
         tipoComprobante: factura.tipoComprobante,
         numeroComprobante: factura.numeroComprobante,
         fechaEmisionAFIP: factura.fechaEmisionAFIP,
-        fechaVencimientoCAE: factura.fechaVencimientoCAE,
+        fechaVencimientoCAE: factura.caeVencimiento,
         caeValido,
         cliente: {
           nombre: factura.cliente.nombre,

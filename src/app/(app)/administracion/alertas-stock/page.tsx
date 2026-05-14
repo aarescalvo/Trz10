@@ -6,6 +6,7 @@ import { AlertasStockModule } from '@/modules-pending/alertas-stock'
 
 export default function Page() {
   const { operador } = useAuth()
+  if (!operador) return null
   return (
     <EditableScreenWrapper moduloId="alertasStock" operador={operador}>
       <AlertasStockModule operador={operador} />

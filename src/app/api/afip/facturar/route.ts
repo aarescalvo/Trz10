@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
         caeVencimiento: resultado.caeVencimiento,
         tipoComprobante,
         puntoVenta: config.puntoVenta,
-        numeroAfip: resultado.numeroComprobante,
+        numeroAfip: String(resultado.numeroComprobante),
         numero: `${String(config.puntoVenta).padStart(4, '0')}-${String(resultado.numeroComprobante).padStart(8, '0')}`,
         estado: 'EMITIDA',
         fechaEmision: new Date()

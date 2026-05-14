@@ -81,7 +81,7 @@ interface MenudenciaItem {
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function MenudenciasTropaModule({ operador }: { operador: Operador }) {

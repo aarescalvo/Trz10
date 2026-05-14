@@ -30,7 +30,7 @@ interface Camara {
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function Camaras({ operador }: { operador: Operador }) {

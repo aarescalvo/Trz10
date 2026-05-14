@@ -67,7 +67,7 @@ interface Stats {
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function StockCamarasModule({ operador }: { operador: Operador }) {

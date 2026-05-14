@@ -37,7 +37,7 @@ interface ListaFaena {
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function CierreFaenaModule({ operador }: { operador: Operador }) {

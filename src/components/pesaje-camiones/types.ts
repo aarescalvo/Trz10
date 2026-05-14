@@ -3,7 +3,7 @@
 export interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
   permisos: Record<string, boolean>
 }
 

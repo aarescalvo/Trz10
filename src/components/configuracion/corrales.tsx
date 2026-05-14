@@ -24,7 +24,7 @@ interface Corral {
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function Corrales({ operador }: { operador: Operador }) {

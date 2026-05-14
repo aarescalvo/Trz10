@@ -51,7 +51,7 @@ interface Moneda {
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function MonedasConfig({ operador }: { operador: Operador }) {

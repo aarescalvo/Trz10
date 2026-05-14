@@ -36,7 +36,7 @@ import { useToast } from '@/hooks/use-toast'
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 interface ConfiguracionBackup {

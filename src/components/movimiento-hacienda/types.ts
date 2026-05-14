@@ -46,7 +46,7 @@ export interface CorralStock {
 export interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export type EstadoTropa = 

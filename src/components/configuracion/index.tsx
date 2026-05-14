@@ -30,7 +30,7 @@ import { AuditoriaConfig } from './auditoria'
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function ConfiguracionModule({ operador }: { operador: Operador }) {

@@ -48,7 +48,7 @@ interface Tropa {
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function MenudenciasModule({ operador }: { operador: Operador }) {

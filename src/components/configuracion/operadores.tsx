@@ -72,7 +72,7 @@ interface OperadorItem {
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function Operadores({ operador }: { operador: Operador }) {

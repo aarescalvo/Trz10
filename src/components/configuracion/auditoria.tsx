@@ -5,7 +5,7 @@ import { AuditoriaViewer } from '@/components/auditoria'
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
 }
 
 export function AuditoriaConfig({ operador }: { operador: Operador }) {

@@ -63,7 +63,7 @@ interface ListaFaena {
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  nivel?: string
   rol?: string
   permisos?: Record<string, boolean>
 }

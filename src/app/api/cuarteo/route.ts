@@ -204,6 +204,8 @@ export async function POST(request: NextRequest) {
             mediaResId,
             tipo: tipoEnum,
             tipoCuartoId: c.tipoCuartoId || null,
+            pesoOriginal: mediaRes?.peso ? mediaRes.peso / 2 : peso,
+            pesoCuarto: peso,
             peso,
             codigo: `CRT-${timestamp}-${i + 1}`,
             tropaCodigo: mediaRes?.romaneo?.tropaCodigo || null,

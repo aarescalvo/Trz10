@@ -2254,6 +2254,8 @@ enum EstadoCaja {
   EN_PALLETS      // Asignada a pallet
   DESPACHADA      // Despachada
   ANULADA         // Anulada
+  ARMADA          // Caja armada (producción)
+  DEGRADADA       // Caja degradada
 }
 
 // ==================== CICLO II - PALLET ====================

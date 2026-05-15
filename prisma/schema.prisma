@@ -203,12 +203,18 @@ model Operador {
   puedeListaFaena         Boolean @default(false)
   puedeRomaneo            Boolean @default(false)
   puedeIngresoCajon       Boolean @default(false)
+  puedeCuarteo            Boolean @default(false)
+  puedeDesposte           Boolean @default(false)
+  puedeEmpaque            Boolean @default(false)
+  puedeExpedicionC2       Boolean @default(false)
   puedeMenudencias        Boolean @default(false)
   puedeStock              Boolean @default(false)
   puedeReportes           Boolean @default(false)
   puedeCCIR               Boolean @default(false)
   puedeFacturacion        Boolean @default(false)
   puedeConfiguracion      Boolean @default(false)
+  puedeCalidad            Boolean @default(false)
+  puedeAutorizarReportes  Boolean @default(false)
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

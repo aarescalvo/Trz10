@@ -124,8 +124,8 @@ export async function POST(request: NextRequest) {
         if (cajasAnteriores.length > 0) {
           fifoAlerts.push({
             producto: caja.productoDesposte?.nombre || 'Desconocido',
-            cajaActual: caja.numero,
-            cajasAnteriores: cajasAnteriores.map(c => c.numero)
+            cajaActual: caja.numero || 'S/N',
+            cajasAnteriores: cajasAnteriores.map(c => c.numero || 'S/N')
           })
         }
       }

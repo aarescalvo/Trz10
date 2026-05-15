@@ -74,6 +74,7 @@ model Camara {
   // Ciclo II
   cuartos             Cuarto[]            // Cuartos en esta cámara
   cajasEmpaque        CajaEmpaque[]       // Cajas en esta cámara
+  pallets             Pallet[]            // Pallets en esta cámara
 
 
   // ==================== REVERSE RELATIONS (auto-added) ====================
@@ -2035,7 +2036,18 @@ model Cuarto {
   // Pesos
   pesoOriginal    Float                   // Peso de la media res original / 2
   pesoCuarto      Float                   // Peso real después de cuarteo
+  peso            Float?                  // Peso alternativo (legacy)
   merma           Float         @default(0)  // Diferencia (merma caliente-frío)
+
+  // Tipo de cuarto
+  tipoCuartoId    String?
+  tipoCuarto      C2TipoCuarto? @relation("CuartoTipoCuarto", fields: [tipoCuartoId], references: [id])
+  tipo            String?                  // Tipo legacy
+
+  // Campos adicionales del código
+  tropaCodigo     String?                  // Código de tropa
+  garron          String?                  // Número de garrón
+  registroCuarteoId String?                // FK a registro de cuarteo
   
   // Ubicación
   camaraId        String?
@@ -2108,6 +2120,7 @@ model LoteDespostada {
   kgIngresados    Float         @default(0)  // Suma de cuartos ingresados
   kgProducidos    Float         @default(0)  // Suma de cajas producidas
   kgMermas        Float         @default(0)  // Huesos, grasas, incomestibles
+  totalKg         Float         @default(0)  // Total kg (legacy alias)
   
   // Rendimiento
   rendimiento     Float?                    // Calculado: kgProducidos / kgIngresados * 100
@@ -2191,6 +2204,23 @@ model CajaEmpaque {
   palletId        String?
   pallet          Pallet?       @relation(fields: [palletId], references: [id])
   
+  // Producto (C2)
+  productoDesposteId String?
+  productoDesposte   C2ProductoDesposte? @relation(fields: [productoDesposteId], references: [id])
+
+  // Cuarto
+  cuartoId        String?
+  cuarto          Cuarto?       @relation(fields: [cuartoId], references: [id])
+
+  // Campos legacy usados por el código
+  numero          String?       // Número de caja (legacy)
+  tara            Float?        // Tara de la caja (kg)
+  piezas          Int?          // Cantidad de piezas (alias de unidades)
+  tropaCodigo     String?       // Código de tropa
+  fechaFaena      DateTime?     // Fecha de faena
+  fechaDesposte   DateTime?     // Fecha de desposte
+  barcodeGs1_128  String?       // Barcode GS1-128 completo
+
   // Estado
   estado          EstadoCaja    @default(EN_CAMARA)
   
@@ -2232,6 +2262,7 @@ enum EstadoCaja {
 model Pallet {
   id              String        @id @default(cuid())
   numero          Int           @unique   // Número correlativo de pallet
+  codigo          String?       // Código alternativo (legacy)
   
   // Fecha
   fecha           DateTime      @default(now())
@@ -2239,7 +2270,12 @@ model Pallet {
   // Destino
   destino         String?
   destinoId       String?       // ID de cliente/destino
-  
+
+  // Cámara
+  camaraId        String?
+  camara          Camara?       @relation(fields: [camaraId], references: [id])
+  esMixto         Boolean       @default(false)
+
   // Cajas
   cantidadCajas   Int           @default(0)
   pesoTotal       Float         @default(0)
@@ -2635,6 +2671,7 @@ model MovimientoDespostada {
   // Pesos
   pesoOriginal    Float             // Peso antes de limpieza
   pesoLimpio      Float?            // Peso después de limpieza
+  pesoNeto        Float?            // Peso neto (legacy alias)
   pesoDesperdicio Float?            // Diferencia = merma
   
   // Destino del corte
@@ -3476,7 +3513,7 @@ model C2TipoCuarto {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  cuartos Cuarto[]
+  cuartos Cuarto[] @relation("CuartoTipoCuarto")
 
   @@index([activo])
   @@index([orden])

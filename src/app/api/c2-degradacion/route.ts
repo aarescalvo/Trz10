@@ -22,9 +22,9 @@ export async function GET(request: NextRequest) {
         cajaOriginal: {
           select: {
             id: true,
-            numero: true,
+            numeradorCaja: true,
             pesoNeto: true,
-            productoDesposte: { select: { nombre: true, codigo: true } }
+            producto: { select: { id: true, nombre: true } }
           }
         },
         nuevoProducto: { select: { id: true, nombre: true, codigo: true } },

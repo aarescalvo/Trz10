@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         _count: {
           select: {
             degradaciones: true,
-            expedicionItems: true
+            expedicionesItem: true
           }
         }
       }
@@ -207,7 +207,7 @@ export async function DELETE(request: NextRequest) {
     // Verificar que no tenga expediciones asociadas
     const expedicionesAsociadas = await db.cajaEmpaque.findUnique({
       where: { id },
-      include: { _count: { select: { expedicionItems: true } } }
+      include: { _count: { select: { expedicionesItem: true } } }
     })
 
     if (!expedicionesAsociadas) {
@@ -217,7 +217,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    if (expedicionesAsociadas._count.expedicionItems > 0) {
+    if (expedicionesAsociadas._count.expedicionesItem > 0) {
       return NextResponse.json(
         { success: false, error: 'No se puede eliminar, tiene expediciones asociadas' },
         { status: 400 }

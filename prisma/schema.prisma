@@ -192,6 +192,7 @@ model Operador {
   usuario       String   @unique
   password      String   // Hash de la contraseña
   pin           String?  // PIN numérico opcional
+  pinSupervisor String?  // PIN de supervisor para validación doble
   rol           RolOperador @default(OPERADOR)
   email         String?
   activo        Boolean  @default(true)

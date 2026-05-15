@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         where: { id: { in: cuartosGrupo.map(c => c.id) } },
         data: {
           estado: 'EN_DESPOSTADA',
-          ingresoDespostadaId: ingreso.id
+          fechaIngresoDespostada: new Date()
         }
       })
 

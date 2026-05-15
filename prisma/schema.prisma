@@ -2268,6 +2268,7 @@ model Pallet {
   id              String        @id @default(cuid())
   numero          Int           @unique   // Número correlativo de pallet
   codigo          String?       // Código alternativo (legacy)
+  ssccCode        String?       // Código SSCC (GS1)
   
   // Fecha
   fecha           DateTime      @default(now())

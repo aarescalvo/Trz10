@@ -253,9 +253,9 @@ export function MovimientosDespostadaModule({ operador }: Props) {
   const totalCortes = movimientos.filter(m => m.tipo === 'CORTE')
   const totalHuesos = movimientos.filter(m => m.tipo === 'HUESO')
   const totalGrasas = movimientos.filter(m => m.tipo === 'GRASA')
-  const kgCortes = totalCortes.reduce((a, m) => a + m.pesoBruto, 0)
-  const kgHuesos = totalHuesos.reduce((a, m) => a + m.pesoBruto, 0)
-  const kgGrasas = totalGrasas.reduce((a, m) => a + m.pesoBruto, 0)
+  const kgCortes = totalCortes.reduce((a, m) => a + (m.pesoOriginal || 0), 0)
+  const kgHuesos = totalHuesos.reduce((a, m) => a + (m.pesoOriginal || 0), 0)
+  const kgGrasas = totalGrasas.reduce((a, m) => a + (m.pesoOriginal || 0), 0)
 
   // Filtrar movimientos
   const movimientosFiltrados = movimientos.filter(m => {
@@ -559,13 +559,13 @@ export function MovimientosDespostadaModule({ operador }: Props) {
                           <div>
                             <p className="text-xs text-stone-500">Huesos</p>
                             <p className="font-bold text-stone-600">
-                              {huesosLote.reduce((a, m) => a + m.pesoBruto, 0).toLocaleString()} kg
+                              {huesosLote.reduce((a, m) => a + (m.pesoOriginal || 0), 0).toLocaleString()} kg
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-stone-500">Grasas</p>
                             <p className="font-bold text-yellow-600">
-                              {grasasLote.reduce((a, m) => a + m.pesoBruto, 0).toLocaleString()} kg
+                              {grasasLote.reduce((a, m) => a + (m.pesoOriginal || 0), 0).toLocaleString()} kg
                             </p>
                           </div>
                         </div>
@@ -656,7 +656,7 @@ export function MovimientosDespostadaModule({ operador }: Props) {
                           <TableCell>{getTipoBadge(mov.tipo)}</TableCell>
                           <TableCell>{mov.productoNombre || mov.producto?.nombre || '-'}</TableCell>
                           <TableCell className="text-right font-medium">
-                            {mov.pesoBruto.toLocaleString()} kg
+                            {(mov.pesoOriginal ?? 0).toLocaleString()} kg
                           </TableCell>
                           <TableCell className="text-right text-green-600">
                             {mov.pesoNeto?.toLocaleString() || '-'}

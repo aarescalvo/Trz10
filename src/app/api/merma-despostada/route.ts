@@ -48,12 +48,12 @@ export async function GET(request: NextRequest) {
     // Calcular estadísticas
     const stats = {
       total: mermas.length,
-      pesoTotal: mermas.reduce((acc, m) => acc + m.pesoDesperdicio, 0),
+      pesoTotal: mermas.reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
       porTipo: {
-        hueso: mermas.filter(m => m.tipo === 'HUESO').reduce((acc, m) => acc + m.pesoDesperdicio, 0),
-        grasa: mermas.filter(m => m.tipo === 'GRASA').reduce((acc, m) => acc + m.pesoDesperdicio, 0),
-        merma: mermas.filter(m => m.tipo === 'MERMA').reduce((acc, m) => acc + m.pesoDesperdicio, 0),
-        desecho: mermas.filter(m => m.tipo === 'DESECHO').reduce((acc, m) => acc + m.pesoDesperdicio, 0),
+        hueso: mermas.filter(m => m.tipo === 'HUESO').reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
+        grasa: mermas.filter(m => m.tipo === 'GRASA').reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
+        merma: mermas.filter(m => m.tipo === 'MERMA').reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
+        desecho: mermas.filter(m => m.tipo === 'DESECHO').reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
       }
     }
 
@@ -163,8 +163,8 @@ export async function PUT(request: NextRequest) {
     if (observaciones) updateData.observaciones = observaciones
 
     // Si cambia el peso, actualizar el lote
-    if (pesoKg !== undefined && pesoKg !== mermaActual.pesoDesperdicio) {
-      const diferencia = pesoKg - mermaActual.pesoDesperdicio
+    if (pesoKg !== undefined && mermaActual.pesoDesperdicio !== null && pesoKg !== mermaActual.pesoDesperdicio) {
+      const diferencia = pesoKg - (mermaActual.pesoDesperdicio || 0)
       updateData.pesoDesperdicio = pesoKg
 
       if (mermaActual.loteId) {
@@ -234,7 +234,7 @@ export async function DELETE(request: NextRequest) {
         where: { id: merma.loteId },
         data: {
           totalKg: {
-            decrement: merma.pesoDesperdicio
+            decrement: merma.pesoDesperdicio || 0
           }
         }
       })

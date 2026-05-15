@@ -691,7 +691,7 @@ export default function C2ProduccionModule({ operador }: { operador: Operador })
                         </TableCell>
                         <TableCell className="font-medium">{c.pesoNeto.toFixed(2)} kg</TableCell>
                         <TableCell className="text-stone-500">{c.tara.toFixed(2)} kg</TableCell>
-                        <TableCell>{c.piezas}</TableCell>
+                        <TableCell>{c.piezas ?? 0}</TableCell>
                         <TableCell className="text-sm text-stone-500">{c.tropaCodigo || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={

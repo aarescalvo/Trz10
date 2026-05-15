@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       pesoNeto: c.pesoNeto,
       pesoBruto: c.pesoBruto,
       tara: c.tara,
-      piezas: c.piezas,
+      piezas: c.piezas ?? 0,
       propietario: c.propietario?.nombre || '-',
       estado: c.estado,
       destino: c.propietario?.nombre || '-',

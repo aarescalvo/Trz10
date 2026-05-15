@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
       total: cajas.length,
       pesoNetoTotal: cajas.reduce((acc, c) => acc + c.pesoNeto, 0),
       pesoBrutoTotal: cajas.reduce((acc, c) => acc + c.pesoBruto, 0),
-      piezasTotal: cajas.reduce((acc, c) => acc + c.piezas, 0),
+      piezasTotal: cajas.reduce((acc, c) => acc + (c.piezas || 0), 0),
       porEstado: {
         enCamara: cajas.filter(c => c.estado === 'EN_CAMARA').length,
         enPallet: cajas.filter(c => c.estado === 'EN_PALLETS').length,

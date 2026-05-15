@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
           camaraDestino: m.camaraDestino?.nombre || null,
           producto: m.producto,
           cantidad: m.cantidad,
-          peso: m.peso,
+          peso: m.peso ?? null,
           tropaCodigo: m.tropaCodigo,
           observaciones: m.observaciones,
           operador: m.operador?.nombre || null

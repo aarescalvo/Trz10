@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const stats = {
       total: movimientos.length,
       totalKgNeto: movimientos.reduce((acc, m) => acc + (m.pesoNeto || 0), 0),
-      totalKgBruto: movimientos.reduce((acc, m) => acc + (m.pesoBruto || 0), 0),
+      totalKgBruto: movimientos.reduce((acc, m) => acc + (m.pesoOriginal || 0), 0),
       totalMermas: movimientos.reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
       porTipo: {
         CORTE: movimientos.filter(m => m.tipo === 'CORTE').length,

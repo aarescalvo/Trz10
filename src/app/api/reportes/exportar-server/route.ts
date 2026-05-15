@@ -364,7 +364,7 @@ async function fetchCajasData(filters: ExportRequestBody['filters']): Promise<{ 
       c.pesoNeto,
       c.pesoBruto,
       c.tara,
-      c.piezas,
+      c.piezas ?? 0,
       c.propietario?.nombre || '-',
       c.estado,
     ]),

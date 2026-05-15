@@ -2206,7 +2206,7 @@ model CajaEmpaque {
   
   // Producto (C2)
   productoDesposteId String?
-  productoDesposte   C2ProductoDesposte? @relation(fields: [productoDesposteId], references: [id])
+  productoDesposte   C2ProductoDesposte? @relation("CajaProductoDesposteFK", fields: [productoDesposteId], references: [id])
 
   // Cuarto
   cuartoId        String?
@@ -3446,7 +3446,7 @@ model C2ProductoDesposte {
   updatedAt DateTime @updatedAt
 
   bomItems           C2BOM[]
-  cajas              CajaEmpaque[]
+  cajas              CajaEmpaque[] @relation("CajaProductoDesposteFK")
   stockProductos     StockProducto[]
   degradacionesHacia C2MovimientoDegradacion[] @relation("ProductoDegradadoHacia")
 

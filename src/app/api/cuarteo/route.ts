@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
             peso,
             codigo: `CRT-${timestamp}-${i + 1}`,
             tropaCodigo: mediaRes?.romaneo?.tropaCodigo || null,
-            garron: mediaRes?.romaneo?.garron || null,
+            garron: mediaRes?.romaneo?.garron != null ? String(mediaRes.romaneo.garron) : null,
             sigla: mediaRes?.sigla || 'A',
             camaraId: camaraId || null,
             estado: 'EN_CAMARA',

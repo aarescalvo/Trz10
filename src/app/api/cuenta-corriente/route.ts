@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
         estado: { not: 'ANULADA' },
       },
       include: {
-        pagos: {
+        pagosFactura: {
           orderBy: { fecha: 'desc' },
         },
         detalles: {

@@ -76,8 +76,15 @@ export async function POST(request: NextRequest) {
       where: { mediaResId: mediaRes.id },
       include: {
         despacho: {
-          include: {
-            cliente: true
+          select: {
+            id: true,
+            numero: true,
+            fecha: true,
+            destino: true,
+            estado: true,
+            patenteCamion: true,
+            chofer: true,
+            remito: true,
           }
         }
       }
@@ -211,7 +218,7 @@ export async function POST(request: NextRequest) {
      
       const despachosData = despachoItems.map((d: any) => [
         d.despacho?.numero?.toString() || '-',
-        d.despacho?.cliente?.nombre || '-',
+        d.despacho?.destino || '-',
         d.despacho?.fecha ? new Date(d.despacho.fecha as string | Date).toLocaleDateString('es-AR') : '-',
         `${Number(d.peso).toFixed(1)} kg`,
         d.despacho?.estado || '-'
@@ -219,7 +226,7 @@ export async function POST(request: NextRequest) {
 
       autoTable(doc, {
         startY: yPos,
-        head: [['Nº Despacho', 'Cliente', 'Fecha', 'Peso', 'Estado']],
+        head: [['Nº Despacho', 'Destino', 'Fecha', 'Peso', 'Estado']],
         body: despachosData,
         theme: 'striped',
         headStyles: { fillColor: [120, 53, 15] },

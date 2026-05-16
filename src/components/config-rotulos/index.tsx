@@ -428,7 +428,7 @@ OPCIÓN 2 - Exportar ZPL:
     const file = e.target.files?.[0]
     if (!file) return
 
-    const extension = file.name.split('.').pop()?.toLowerCase()
+    const extension = file.name.split('.').pop()?.toLowerCase() || ''
     const extensionesValidas = ['zpl', 'prn', 'dpl', 'nlbl', 'lbl', 'nrx', 'itf', 'txt']
     
     if (!extensionesValidas.includes(extension || '')) {

@@ -30,6 +30,7 @@ interface Movimiento {
   producto?: { codigo: string; nombre: string }
   productoNombre?: string
   pesoBruto: number
+  pesoOriginal?: number
   pesoNeto?: number
   pesoDesperdicio?: number
   destino?: 'PRODUCCION' | 'RECORTE' | 'DESECHO'

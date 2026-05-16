@@ -522,7 +522,7 @@ async function generarReporteExpedicion(
       fecha: d.fecha,
       destino: d.destino || '',
       patenteCamion: d.patenteCamion || '',
-      chofer: d.chofer || d.choferNombre || '',
+      chofer: d.chofer || '',
       remito: d.remito || '',
       cantidadMedias: d.cantidadMedias || 0,
       kgTotal: d.kgTotal || 0,

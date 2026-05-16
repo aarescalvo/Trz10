@@ -138,15 +138,16 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // Actualizar saldo de factura
-      const nuevoSaldo = factura.saldo - monto
+      // Calcular saldo dinámicamente (no hay campo saldo en Factura)
+      const pagosExistentes = await tx.pagoFactura.findMany({ where: { facturaId } })
+      const totalPagadoAntes = pagosExistentes.reduce((s, p) => s + p.monto, 0)
+      const nuevoSaldo = factura.total - totalPagadoAntes - monto
       const nuevoEstado = nuevoSaldo <= 0 ? 'PAGADA' as const : 
                     (factura.estado === 'EMITIDA' || factura.estado === 'PENDIENTE') ? 'EMITIDA' as const : factura.estado
 
       await tx.factura.update({
         where: { id: facturaId },
         data: {
-          saldo: Math.max(0, nuevoSaldo),
           estado: nuevoEstado,
         }
       })
@@ -194,14 +195,12 @@ export async function DELETE(request: NextRequest) {
         throw new Error('Pago no encontrado')
       }
 
-      // Restaurar saldo de factura
+      // Restaurar estado de factura (saldo se calcula dinámicamente)
       const factura = pago.factura
-      const nuevoSaldo = factura.saldo + pago.monto
 
       await tx.factura.update({
         where: { id: factura.id },
         data: {
-          saldo: nuevoSaldo,
           estado: 'EMITIDA' as const,
         }
       })
@@ -233,7 +232,7 @@ export async function obtenerCuentaCorriente(clienteId: string) {
       estado: { in: ['PENDIENTE', 'EMITIDA'] }
     },
     include: {
-      pagos: true,
+      pagosFactura: true,
       detalles: true
     },
     orderBy: { fecha: 'asc' }

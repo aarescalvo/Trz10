@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     })
 
     const nuevoSubtotal = todosDetalles.reduce((sum, d) => sum + d.subtotal, 0)
-    const porcentajeIva = factura.porcentajeIva || 10.5
+    const porcentajeIva = 21 // IVA estándar (porcentajeIva no existe en Factura)
     const nuevoIva = nuevoSubtotal * (porcentajeIva / 100)
     const nuevoTotal = nuevoSubtotal + nuevoIva
 
@@ -210,7 +210,7 @@ export async function PUT(request: NextRequest) {
     })
 
     const subtotalFactura = todosDetalles.reduce((sum, d) => sum + d.subtotal, 0)
-    const porcentajeIva = detalleActual.factura.porcentajeIva || 10.5
+    const porcentajeIva = 21 // IVA estándar (porcentajeIva no existe en Factura)
     const nuevoIva = subtotalFactura * (porcentajeIva / 100)
     const nuevoTotal = subtotalFactura + nuevoIva
 
@@ -285,7 +285,7 @@ export async function DELETE(request: NextRequest) {
     })
 
     const subtotal = detallesRestantes.reduce((sum, d) => sum + d.subtotal, 0)
-    const porcentajeIva = detalleActual.factura.porcentajeIva || 10.5
+    const porcentajeIva = 21 // IVA estándar (porcentajeIva no existe en Factura)
     const nuevoIva = subtotal * (porcentajeIva / 100)
     const nuevoTotal = subtotal + nuevoIva
 

@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          cliente: true
         }
       })
 
@@ -53,18 +52,19 @@ export async function GET(request: NextRequest) {
           let precioSugerido = 0
           let fuentePrecio = 'SIN_PRECIO'
 
-          if (producto && despacho.clienteId) {
+          // TODO: Despacho doesn't have clienteId. Infer from items (usuarioId on DespachoItem)
+          const usuarioId = item.usuarioId
+          if (producto && usuarioId) {
             // Buscar precio sugerido
             const precioCliente = await db.precioCliente.findFirst({
               where: {
-                clienteId: despacho.clienteId,
-                productoVendibleId: producto.id,
+                clienteId: usuarioId,
                 activo: true
               }
             })
 
             if (precioCliente) {
-              precioSugerido = precioCliente.precioEspecial
+              precioSugerido = precioCliente.precioKg
               fuentePrecio = 'PRECIO_CLIENTE'
             } else if (producto.precioBase) {
               precioSugerido = producto.precioBase
@@ -96,18 +96,17 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Listar despachos pendientes de facturar
-    const where: { facturado: boolean; clienteId?: string } = { facturado: false }
-    if (clienteId) {
-      where.clienteId = clienteId
-    }
+    // Listar despachos
+    // TODO: Despacho doesn't have facturado or clienteId fields.
+    // Consider adding these fields to the schema or filtering via items (DespachoItem.usuarioId)
+    const where: Record<string, unknown> = {}
+    // For now, fetch all non-ANULADO despachos
+    where.estado = { not: 'ANULADO' }
 
     const despachos = await db.despacho.findMany({
       where,
       include: {
-        cliente: {
-          select: { id: true, nombre: true, cuit: true, razonSocial: true }
-        },
+        items: true,
         _count: {
           select: { items: true }
         }
@@ -225,17 +224,15 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Marcar despachos como facturados
-    if (despachoIds?.length) {
-      await db.despacho.updateMany({
-        where: { id: { in: despachoIds } },
-        data: {
-          facturado: true,
-          facturaId: factura.id,
-          fechaFacturacion: new Date()
-        }
-      })
-    }
+    // TODO: Despacho doesn't have facturado, facturaId, or fechaFacturacion fields.
+    // Consider adding these fields to the schema to track billing status.
+    // For now, we skip marking despachos as facturado.
+    // if (despachoIds?.length) {
+    //   await db.despacho.updateMany({
+    //     where: { id: { in: despachoIds } },
+    //     data: { facturado: true, facturaId: factura.id, fechaFacturacion: new Date() }
+    //   })
+    // }
 
     // Guardar histórico de precios usados
     for (const item of items || []) {

@@ -298,8 +298,7 @@ export async function POST(request: NextRequest) {
     const tropas = await db.tropa.findMany({
       where: tropasWhere,
       include: {
-        usuarioFaena: { select: { id: true, nombre: true } },
-        _count: { select: { romaneos: true } }
+        usuarioFaena: { select: { id: true, nombre: true } }
       },
       orderBy: { numero: 'asc' }
     })

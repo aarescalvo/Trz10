@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
 
       for (const tropa of tropasCliente) {
         const kgGancho = tropa.kgGancho || 0
-        const precioKg = tropa.precioServicioKg || 0
+        // precioServicioKg doesn't exist on Tropa; use 0 and let front-end provide prices
+        const precioKg = 0
         const subtotalTropa = kgGancho * precioKg
         subtotal += subtotalTropa
 
@@ -105,13 +106,9 @@ export async function POST(request: NextRequest) {
           numeroInterno: numerador.ultimoNumero,
           tipoComprobante,
           clienteId,
-          clienteCuit: cliente.cuit,
-          clienteCondicionIva: cliente.condicionIva as CondicionIva,
-          clienteDireccion: cliente.direccion,
           fecha: new Date(),
           subtotal,
           iva,
-          porcentajeIva,
           total,
           estado: 'PENDIENTE',
           condicionVenta: 'CUENTA_CORRIENTE',
@@ -126,17 +123,9 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // Actualizar las tropas con los datos de facturación
-      for (const tropa of tropasCliente) {
-        await db.tropa.update({
-          where: { id: tropa.id },
-          data: {
-            numeroFactura: numero,
-            fechaFactura: new Date(),
-            estadoPago: 'PENDIENTE',
-          }
-        })
-      }
+      // Nota: Tropa model doesn't have numeroFactura, fechaFactura, estadoPago fields.
+      // Factura-tropa relationship is tracked via DetalleFactura.tropaCodigo.
+      // No tropa update needed here.
 
       facturasCreadas.push(factura)
     }

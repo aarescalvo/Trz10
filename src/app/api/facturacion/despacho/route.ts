@@ -175,18 +175,13 @@ export async function POST(request: NextRequest) {
           numeroInterno: numerador.ultimoNumero,
           tipoComprobante,
           clienteId: usuarioId,
-          clienteCuit: cliente.cuit,
-          clienteCondicionIva: cliente.condicionIva as CondicionIva | null,
-          clienteDireccion: cliente.direccion,
           fecha: new Date(),
           subtotal,
           iva,
-          porcentajeIva,
           total,
           estado: 'PENDIENTE',
           condicionVenta: 'CUENTA_CORRIENTE',
           remito: despacho.remito || undefined,
-          despachoId,
           operadorId,
           detalles: {
              

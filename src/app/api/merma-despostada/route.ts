@@ -20,12 +20,12 @@ export async function GET(request: NextRequest) {
     const where: any = {}
     if (loteId) where.loteId = loteId
     // Solo mostrar movimientos de tipo merma (no CORTE)
-    where.tipo = { in: ['HUESO', 'GRASA', 'MERMA', 'DESPERICIO'] }
+    where.tipo = { in: ['HUESO', 'GRASA', 'MERMA', 'DESPERDICIO'] }
     if (tipo) where.tipo = tipo
     if (fechaDesde || fechaHasta) {
-      where.fecha = {}
-      if (fechaDesde) where.fecha.gte = new Date(fechaDesde)
-      if (fechaHasta) where.fecha.lte = new Date(fechaHasta)
+      where.createdAt = {}
+      if (fechaDesde) where.createdAt.gte = new Date(fechaDesde)
+      if (fechaHasta) where.createdAt.lte = new Date(fechaHasta)
     }
 
     const mermas = await db.movimientoDespostada.findMany({
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
           select: { id: true, nombre: true }
         }
       },
-      orderBy: { fecha: 'desc' }
+      orderBy: { createdAt: 'desc' }
     })
 
     // Calcular estadísticas
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         hueso: mermas.filter(m => m.tipo === 'HUESO').reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
         grasa: mermas.filter(m => m.tipo === 'GRASA').reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
         merma: mermas.filter(m => m.tipo === 'MERMA').reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
-        desperdicio: mermas.filter(m => m.tipo === 'DESPERICIO').reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
+        desperdicio: mermas.filter(m => m.tipo === 'DESPERDICIO').reduce((acc, m) => acc + (m.pesoDesperdicio || 0), 0),
       }
     }
 
@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
       data: {
         loteId,
         tipo,
+        pesoOriginal: 0,
         pesoDesperdicio: pesoKg,
         observaciones,
         operadorId

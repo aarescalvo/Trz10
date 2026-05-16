@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const stats = {
       total: pallets.length,
       armados: pallets.filter(p => p.estado === 'ARMADO').length,
-      enCamara: pallets.filter(p => p.estado === 'EN_CAMARA').length,
+      completos: pallets.filter(p => p.estado === 'COMPLETO').length,
       despachados: pallets.filter(p => p.estado === 'DESPACHADO').length,
       totalCajas: pallets.reduce((acc, p) => acc + p.cantidadCajas, 0),
       pesoTotal: pallets.reduce((acc, p) => acc + p.pesoTotal, 0)
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       orderBy: { numero: 'desc' }
     })
 
-    const numero = String((parseInt(ultimoPallet?.numero || '0', 10) || 0) + 1)
+    const numero = ((ultimoPallet?.numero || 0) + 1)
 
     const pallet = await db.pallet.create({
       data: {
@@ -122,7 +122,7 @@ export async function PUT(request: NextRequest) {
     })
 
     // Si se cierra el pallet, actualizar estado de las cajas
-    if (estado === 'EN_CAMARA') {
+    if (estado === 'COMPLETO') {
       await db.cajaEmpaque.updateMany({
         where: { palletId: id },
         data: { estado: 'EN_PALLETS' }

@@ -498,7 +498,9 @@ export function ExportacionSIGICAModule({ operador }: { operador: Operador }) {
                             <div className="flex items-center gap-2">
                               <span className="font-semibold">{tropa.tropaNumero}</span>
                               {tieneInvalidas && (
-                                <AlertCircle className="w-3.5 h-3.5 text-amber-500" title="Hay clasificaciones con advertencia" />
+                                <span className="inline-flex items-center" title="Hay clasificaciones con advertencia">
+                                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                                </span>
                               )}
                             </div>
                           </TableCell>

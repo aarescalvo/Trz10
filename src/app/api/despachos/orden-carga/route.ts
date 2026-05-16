@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
       include: {
         despacho: {
           include: {
-            cliente: true,
             items: true,
           }
         }
@@ -70,7 +69,6 @@ export async function POST(request: NextRequest) {
       include: {
         despacho: {
           include: {
-            cliente: true,
             items: true,
           }
         }

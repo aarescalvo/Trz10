@@ -64,7 +64,7 @@ E
       // Desmarcar otros como default
       await db.rotulo.updateMany({
         where: { 
-          tipo: 'PESAJE_INDIVIDUAL',
+          tipo: 'MEDIA_RES',
           tipoImpresora: 'DATAMAX',
           esDefault: true 
         },
@@ -75,9 +75,8 @@ E
         data: {
           nombre: 'Pesaje Individual 9x6cm - EAN-128 (GS1)',
           codigo: 'PESAJE_INDIVIDUAL_EAN128_V3',
-          tipo: 'PESAJE_INDIVIDUAL',
+          tipo: 'MEDIA_RES',
           tipoImpresora: 'DATAMAX',
-          modeloImpresora: 'MARK_II',
           contenido: rotuloPesajeIndividualEAN128,
           ancho: 90,  // 9cm
           alto: 60,   // 6cm
@@ -140,9 +139,8 @@ E
         data: {
           nombre: 'Pesaje Individual Compacto 9x6cm - Datamax',
           codigo: 'PESAJE_INDIVIDUAL_COMPACTO_DPL',
-          tipo: 'PESAJE_INDIVIDUAL',
+          tipo: 'MEDIA_RES',
           tipoImpresora: 'DATAMAX',
-          modeloImpresora: 'MARK_II',
           contenido: rotuloCompacto,
           ancho: 90,
           alto: 60,
@@ -245,7 +243,6 @@ E
           codigo: 'MEDIA_RES_EAN128_V3',
           tipo: 'MEDIA_RES',
           tipoImpresora: 'DATAMAX',
-          modeloImpresora: 'MARK_II',
           contenido: rotuloMediaRes,
           ancho: 80,
           alto: 120,
@@ -314,7 +311,7 @@ export async function GET(request: NextRequest) {
         nombre: r.nombre,
         codigo: r.codigo,
         tipo: r.tipo,
-        modeloImpresora: r.modeloImpresora,
+        tipoImpresora: r.tipoImpresora,
         ancho: r.ancho,
         alto: r.alto,
         esDefault: r.esDefault

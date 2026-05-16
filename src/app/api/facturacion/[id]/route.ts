@@ -18,7 +18,7 @@ export async function GET(
       include: {
         cliente: true,
         detalles: true,
-        pagos: {
+        pagosFactura: {
           orderBy: { fecha: 'desc' }
         }
       }
@@ -75,7 +75,7 @@ export async function PUT(
     // Verificar que la factura existe y no está pagada
     const facturaExistente = await db.factura.findUnique({
       where: { id },
-      include: { pagos: true }
+      include: { pagosFactura: true }
     })
 
     if (!facturaExistente) {
@@ -171,7 +171,7 @@ export async function PUT(
       include: {
         cliente: true,
         detalles: true,
-        pagos: true
+        pagosFactura: true
       }
     })
 

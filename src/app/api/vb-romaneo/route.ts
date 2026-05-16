@@ -39,10 +39,10 @@ async function getPendientesAsignacion(fecha?: string | null) {
   fechaFin.setHours(23, 59, 59, 999)
 
   // Buscar listas de faena del día sin VB
+  // TODO: Consider adding a filter for ListaFaena that are ABIERTA or EN_PROCESO
   const listasFaena = await db.listaFaena.findMany({
     where: {
       fecha: { gte: fechaFiltro, lte: fechaFin },
-      vbRomaneo: false
     },
     include: {
       tropas: {
@@ -218,7 +218,7 @@ async function getFechasFaena(fechaDesde?: string | null, fechaHasta?: string | 
           tropa: { select: { codigo: true, especie: true } }
         }
       },
-      vbRomaneoOperador: {
+      supervisor: {
         select: { nombre: true }
       }
     },
@@ -233,9 +233,8 @@ async function getFechasFaena(fechaDesde?: string | null, fechaHasta?: string | 
       id: string
       numero: number
       cantidadTotal: number
-      vbRomaneo: boolean
-      vbRomaneoFecha: Date | null
-      vbRomaneoOperador: string | null
+      estado: string
+      supervisor: string | null
       tropas: Array<{ codigo: string; especie: string }>
     }>
   }>()
@@ -253,9 +252,8 @@ async function getFechasFaena(fechaDesde?: string | null, fechaHasta?: string | 
       id: lista.id,
       numero: lista.numero,
       cantidadTotal: lista.cantidadTotal,
-      vbRomaneo: lista.vbRomaneo,
-      vbRomaneoFecha: lista.vbRomaneoFecha,
-      vbRomaneoOperador: lista.vbRomaneoOperador?.nombre || null,
+      estado: lista.estado,
+      supervisor: lista.supervisor?.nombre || null,
       tropas: lista.tropas.map(t => ({ codigo: t.tropa.codigo, especie: t.tropa.especie }))
     })
   }
@@ -264,9 +262,8 @@ async function getFechasFaena(fechaDesde?: string | null, fechaHasta?: string | 
     fecha: f.fecha,
     fechaStr: f.fecha.toLocaleDateString('es-AR'),
     totalAnimales: f.listas.reduce((sum, l) => sum + l.cantidadTotal, 0),
-    vbRomaneo: f.listas.every(l => l.vbRomaneo),
-    vbRomaneoFecha: f.listas[0]?.vbRomaneoFecha,
-    vbRomaneoOperador: f.listas[0]?.vbRomaneoOperador,
+    todasCerradas: f.listas.every(l => l.estado === 'CERRADA'),
+    supervisor: f.listas[0]?.supervisor,
     listas: f.listas,
     listaIds: f.listas.map(l => l.id)
   }))
@@ -524,12 +521,13 @@ async function darVistoBueno(data: { listaIds: string[]; operadorId: string }) {
 
   const ahora = new Date()
 
+  // TODO: ListaFaena doesn't have vbRomaneo fields. Consider closing the lista (estado: 'CERRADA')
+  // and tracking the supervisor who approved via a separate mechanism or using estado field.
   await db.listaFaena.updateMany({
     where: { id: { in: listaIds } },
     data: {
-      vbRomaneo: true,
-      vbRomaneoFecha: ahora,
-      vbRomaneoOperadorId: operadorId
+      estado: 'CERRADA',
+      supervisorId: operadorId
     }
   })
 
@@ -548,12 +546,12 @@ async function quitarVistoBueno(data: { listaIds: string[] }) {
     return NextResponse.json({ success: false, error: 'No se especificaron listas' }, { status: 400 })
   }
 
+  // TODO: ListaFaena doesn't have vbRomaneo fields. Consider reopening the lista.
   await db.listaFaena.updateMany({
     where: { id: { in: listaIds } },
     data: {
-      vbRomaneo: false,
-      vbRomaneoFecha: null,
-      vbRomaneoOperadorId: null
+      estado: 'ABIERTA',
+      supervisorId: null
     }
   })
 

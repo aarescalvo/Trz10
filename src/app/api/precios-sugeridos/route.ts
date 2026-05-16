@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-
-// GET - Obtener precio sugerido para un cliente y producto
 import { checkPermission } from '@/lib/auth-helpers'
+
+// GET - Obtener precio sugerido para un cliente y tipo de producto
 export async function GET(request: NextRequest) {
   const authError = await checkPermission(request, 'puedeFacturacion')
   if (authError) return authError
@@ -10,8 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const clienteId = searchParams.get('clienteId')
-    const productoVendibleId = searchParams.get('productoVendibleId')
-    const codigoProducto = searchParams.get('codigoProducto')
+    const tipoProducto = searchParams.get('tipoProducto')
 
     if (!clienteId) {
       return NextResponse.json(
@@ -20,40 +19,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Si se proporciona código de producto, buscar por código
-    let productoVendibleIdFinal = productoVendibleId
-    let producto: Awaited<ReturnType<typeof db.productoVendible.findUnique>> | null = null
-    if (codigoProducto && !productoVendibleIdFinal) {
-      producto = await db.productoVendible.findUnique({
-        where: { codigo: codigoProducto }
-      })
-      if (!producto) {
-        return NextResponse.json(
-          { success: false, error: 'Producto no encontrado' },
-          { status: 404 }
-        )
-      }
-      productoVendibleIdFinal = producto.id
-    }
-
-    if (!productoVendibleIdFinal) {
+    if (!tipoProducto) {
       return NextResponse.json(
-        { success: false, error: 'productoVendibleId o codigoProducto es requerido' },
+        { success: false, error: 'tipoProducto es requerido' },
         { status: 400 }
-      )
-    }
-
-    // Si no tenemos el producto, buscarlo
-    if (!producto) {
-      producto = await db.productoVendible.findUnique({
-        where: { id: productoVendibleIdFinal! }
-      })
-    }
-
-    if (!producto) {
-      return NextResponse.json(
-        { success: false, error: 'Producto no encontrado' },
-        { status: 404 }
       )
     }
 
@@ -61,7 +30,7 @@ export async function GET(request: NextRequest) {
     const precioCliente = await db.precioCliente.findFirst({
       where: {
         clienteId,
-        productoVendibleId: productoVendibleIdFinal,
+        tipoProducto: tipoProducto as any,
         activo: true,
         OR: [
           { fechaHasta: null },
@@ -75,8 +44,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          precio: precioCliente.precioEspecial,
-          moneda: precioCliente.moneda,
+          precio: precioCliente.precioKg,
+          moneda: 'ARS',
           fuente: 'PRECIO_CLIENTE',
           fuenteDescripcion: 'Precio especial acordado con el cliente',
           precioId: precioCliente.id,
@@ -113,38 +82,6 @@ export async function GET(request: NextRequest) {
           fuenteDescripcion: `Último precio facturado (Factura ${ultimoPrecioFacturado.factura.numero})`,
           fechaUltimaFactura: ultimoPrecioFacturado.factura?.fecha,
           facturaId: ultimoPrecioFacturado.facturaId
-        }
-      })
-    }
-
-    // PRIORIDAD 3: Precio base del producto (último histórico)
-    const ultimoPrecioHistorico = await db.historicoPrecioProducto.findFirst({
-      where: { productoVendibleId: productoVendibleIdFinal },
-      orderBy: { fechaVigencia: 'desc' }
-    })
-
-    if (ultimoPrecioHistorico) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          precio: ultimoPrecioHistorico.precioNuevo,
-          moneda: ultimoPrecioHistorico.moneda,
-          fuente: 'LISTA_BASE',
-          fuenteDescripcion: 'Precio de lista base',
-          fechaVigencia: ultimoPrecioHistorico.fechaVigencia
-        }
-      })
-    }
-
-    // PRIORIDAD 4: Precio base directo del producto
-    if (producto.precioBase) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          precio: producto.precioBase,
-          moneda: producto.moneda,
-          fuente: 'PRECIO_BASE',
-          fuenteDescripcion: 'Precio base del producto'
         }
       })
     }

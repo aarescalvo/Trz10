@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
             id: true,
             tipo: true,
             pesoNeto: true,
-            pesoBruto: true
+            pesoOriginal: true
           }
         }
       },
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         .filter(m => m.tipo === 'GRASA')
         .reduce((acc, m) => acc + (m.pesoNeto || 0), 0)
       const totalMermas = lote.movimientos
-        .filter(m => m.tipo === 'MERMA' || m.tipo === 'DESECHO')
+        .filter(m => m.tipo === 'MERMA' || m.tipo === 'DESPERDICIO')
         .reduce((acc, m) => acc + (m.pesoNeto || 0), 0)
 
       return {

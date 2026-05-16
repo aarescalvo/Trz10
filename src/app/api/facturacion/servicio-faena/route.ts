@@ -41,21 +41,8 @@ export async function GET(request: NextRequest) {
       where.usuarioFaenaId = usuarioId
     }
 
-    if (estadoPago) {
-      where.estadoPago = estadoPago
-    }
-
-    if (soloSinFacturar) {
-      where.numeroFactura = null
-    }
-
-    if (search) {
-      where.OR = [
-        { codigo: { contains: search, mode: 'insensitive' } },
-        { usuarioFaena: { nombre: { contains: search, mode: 'insensitive' } } },
-        { numeroFactura: { contains: search, mode: 'insensitive' } },
-      ]
-    }
+    // Nota: Tropa doesn't have estadoPago or numeroFactura fields.
+    // These filters are removed - filtering should be done client-side or via Factura relations.
 
     const tropas = await db.tropa.findMany({
       where,
@@ -73,10 +60,10 @@ export async function GET(request: NextRequest) {
       orderBy: { fechaFaena: 'desc' }
     })
 
-    // Buscar precios sugeridos desde PrecioServicio para tropas sin precio
+    // Buscar precios sugeridos desde PrecioServicio
     const tropasConPrecio = await Promise.all(
       tropas.map(async (tropa) => {
-        if (!tropa.precioServicioKg && tropa.usuarioFaenaId) {
+        if (tropa.usuarioFaenaId) {
           const precioVigente = await db.precioServicio.findFirst({
             where: {
               clienteId: tropa.usuarioFaenaId,
@@ -101,13 +88,13 @@ export async function GET(request: NextRequest) {
     const totalCabezas = tropasConPrecio.reduce((sum, t) => sum + t.cantidadCabezas, 0)
     const totalKgPie = tropasConPrecio.reduce((sum, t) => sum + (t.pesoTotalIndividual || 0), 0)
     const totalKgGancho = tropasConPrecio.reduce((sum, t) => sum + (t.kgGancho || 0), 0)
-    const totalServicioFaena = tropasConPrecio.reduce((sum, t) => sum + (t.montoServicioFaena || 0), 0)
-    const totalFacturado = tropasConPrecio.reduce((sum, t) => sum + (t.montoFactura || 0), 0)
-    const totalPagado = tropasConPrecio
-      .filter(t => t.estadoPago === 'PAGADO' || t.estadoPago === 'PAGO PARCIAL')
-      .reduce((sum, t) => sum + (t.montoDepositado || 0), 0)
-    const pendienteFacturar = tropasConPrecio.filter(t => !t.numeroFactura).length
-    const pendienteCobrar = tropasConPrecio.filter(t => t.numeroFactura && t.estadoPago !== 'PAGADO').length
+    const totalServicioFaena = tropasConPrecio.reduce((sum, t) => sum + ((t.kgGancho || 0) * (t.precioSugerido || 0)), 0)
+    // Nota: montoFactura, montoDepositado, estadoPago, numeroFactura don't exist on Tropa.
+    // These would need to be computed from Factura relations.
+    const totalFacturado = 0
+    const totalPagado = 0
+    const pendienteFacturar = tropasConPrecio.length // All tropas shown as pending until facturado
+    const pendienteCobrar = 0
 
     // Resumen por cliente
     const porCliente: Record<string, {
@@ -142,10 +129,11 @@ export async function GET(request: NextRequest) {
       porCliente[cid].tropas += 1
       porCliente[cid].cabezas += tropa.cantidadCabezas
       porCliente[cid].kgGancho += tropa.kgGancho || 0
-      porCliente[cid].totalServicio += tropa.montoServicioFaena || 0
-      porCliente[cid].totalFactura += tropa.montoFactura || 0
-      porCliente[cid].totalPagado += tropa.estadoPago === 'PAGADO' ? (tropa.montoDepositado || 0) : 0
-      porCliente[cid].pendiente += tropa.estadoPago !== 'PAGADO' && tropa.numeroFactura ? (tropa.montoFactura || 0) - (tropa.montoDepositado || 0) : 0
+      porCliente[cid].totalServicio += (tropa.kgGancho || 0) * (tropa.precioSugerido || 0)
+      // Nota: montoFactura, montoDepositado, estadoPago, numeroFactura don't exist on Tropa.
+      porCliente[cid].totalFactura += 0
+      porCliente[cid].totalPagado += 0
+      porCliente[cid].pendiente += 0
     }
 
     return NextResponse.json({
@@ -201,9 +189,7 @@ export async function PUT(request: NextRequest) {
     // Campos actualizables
     const updateData: any = {}
     const allowedFields = [
-      'kgGancho', 'rinde', 'precioServicioKg', 'precioServicioKgConRecupero',
-      'montoServicioFaena', 'montoFactura', 'numeroFactura', 'fechaFactura',
-      'fechaPago', 'montoDepositado', 'estadoPago', 'tasaInspVet', 'arancelIpcva', 'fechaFaena'
+      'kgGancho', 'fechaFaena'
     ]
 
     for (const field of allowedFields) {

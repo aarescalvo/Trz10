@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
           peso: registros.filter(r => r.tipo === 'SANGRE').reduce((acc, r) => acc + r.pesoKg, 0)
         }
       },
-      pendientes: registros.filter(r => r.estado === 'REGISTRADO').length,
-      despachados: registros.filter(r => r.estado === 'DESPACHADO').length
+      pendientes: registros.filter(r => !r.despachado).length,
+      despachados: registros.filter(r => r.despachado).length
     }
 
     return NextResponse.json({
@@ -76,7 +76,6 @@ export async function POST(request: NextRequest) {
     const {
       tipo,
       fechaFaena,
-      tropaCodigo,
       pesoKg,
       destino,
       observaciones,
@@ -100,8 +99,7 @@ export async function POST(request: NextRequest) {
     const registro = await db.registroRendering.create({
       data: {
         tipo,
-        fechaFaena: fechaFaena ? new Date(fechaFaena) : null,
-        tropaCodigo: tropaCodigo || null,
+        fechaFaena: fechaFaena ? new Date(fechaFaena) : undefined,
         pesoKg,
         destino: destino || null,
         observaciones: observaciones || null,
@@ -143,10 +141,9 @@ export async function PUT(request: NextRequest) {
     const data = {
       tipo: bodyData.tipo,
       fechaFaena: bodyData.fechaFaena ? new Date(bodyData.fechaFaena) : undefined,
-      tropaCodigo: bodyData.tropaCodigo,
       pesoKg: bodyData.pesoKg ? parseFloat(bodyData.pesoKg) : undefined,
       destino: bodyData.destino,
-      estado: bodyData.estado,
+      despachado: bodyData.despachado,
       remito: bodyData.remito,
       fechaDespacho: bodyData.fechaDespacho ? new Date(bodyData.fechaDespacho) : undefined,
       observaciones: bodyData.observaciones,

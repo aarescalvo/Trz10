@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
       where: facturasWhere,
       include: {
         detalles: true,
-        pagos: true
+        pagosFactura: true
       },
       orderBy: { fecha: 'desc' }
     })

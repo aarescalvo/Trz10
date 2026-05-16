@@ -10,11 +10,11 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const clienteId = searchParams.get('clienteId')
-    const productoVendibleId = searchParams.get('productoVendibleId')
+    const tipoProducto = searchParams.get('tipoProducto')
 
     const where: any = {}
     if (clienteId) where.clienteId = clienteId
-    if (productoVendibleId) where.productoVendibleId = productoVendibleId
+    if (tipoProducto) where.tipoProducto = tipoProducto
 
     const precios = await db.precioCliente.findMany({
       where,
@@ -22,13 +22,9 @@ export async function GET(request: NextRequest) {
         cliente: {
           select: { id: true, nombre: true, cuit: true }
         },
-        productoVendible: {
-          select: { id: true, codigo: true, nombre: true, precioBase: true }
-        }
       },
       orderBy: [
         { cliente: { nombre: 'asc' } },
-        { productoVendible: { nombre: 'asc' } }
       ]
     })
 
@@ -52,20 +48,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { clienteId, productoVendibleId, precioEspecial, moneda, fechaHasta } = body
+    const { clienteId, tipoProducto, precioKg, fechaHasta } = body
 
-    if (!clienteId || !productoVendibleId || precioEspecial === undefined) {
+    if (!clienteId || !tipoProducto || precioKg === undefined) {
       return NextResponse.json(
-        { success: false, error: 'Cliente, producto y precio son requeridos' },
+        { success: false, error: 'Cliente, tipo de producto y precio son requeridos' },
         { status: 400 }
       )
     }
 
-    // Verificar si ya existe un precio para este cliente/producto
+    // Verificar si ya existe un precio para este cliente/tipoProducto
     const existente = await db.precioCliente.findFirst({
       where: {
         clienteId,
-        productoVendibleId,
+        tipoProducto,
         activo: true
       }
     })
@@ -76,13 +72,11 @@ export async function POST(request: NextRequest) {
       precio = await db.precioCliente.update({
         where: { id: existente.id },
         data: {
-          precioEspecial,
-          moneda: moneda || 'ARS',
+          precioKg,
           fechaHasta: fechaHasta ? new Date(fechaHasta) : null
         },
         include: {
           cliente: { select: { id: true, nombre: true } },
-          productoVendible: { select: { id: true, nombre: true } }
         }
       })
     } else {
@@ -90,14 +84,12 @@ export async function POST(request: NextRequest) {
       precio = await db.precioCliente.create({
         data: {
           clienteId,
-          productoVendibleId,
-          precioEspecial,
-          moneda: moneda || 'ARS',
+          tipoProducto,
+          precioKg,
           fechaHasta: fechaHasta ? new Date(fechaHasta) : null
         },
         include: {
           cliente: { select: { id: true, nombre: true } },
-          productoVendible: { select: { id: true, nombre: true } }
         }
       })
     }
@@ -105,7 +97,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: precio,
-      message: `Precio especial guardado: ${precio.cliente.nombre} - ${precio.productoVendible.nombre} = ${precioEspecial} ${moneda || 'ARS'}`
+      message: `Precio guardado: ${precio.cliente.nombre} - ${tipoProducto} = ${precioKg} ARS`
     })
   } catch (error) {
     console.error('Error guardando precio por cliente:', error)
@@ -123,7 +115,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { id, precioEspecial, moneda, fechaHasta, activo } = body
+    const { id, precioKg, fechaHasta, activo } = body
 
     if (!id) {
       return NextResponse.json(
@@ -135,8 +127,7 @@ export async function PUT(request: NextRequest) {
     const precio = await db.precioCliente.update({
       where: { id },
       data: {
-        precioEspecial,
-        moneda,
+        precioKg,
         fechaHasta: fechaHasta ? new Date(fechaHasta) : null,
         activo
       }

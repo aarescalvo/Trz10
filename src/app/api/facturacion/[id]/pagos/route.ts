@@ -74,7 +74,7 @@ export async function POST(
     // Verificar factura
     const factura = await db.factura.findUnique({
       where: { id },
-      include: { pagos: true }
+      include: { pagosFactura: true }
     })
 
     if (!factura) {

@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       include: {
         cliente: true,
         detalles: { orderBy: { createdAt: 'asc' } },
-        pagos: { orderBy: { fecha: 'desc' } },
+        pagosFactura: { orderBy: { fecha: 'desc' } },
         tributos: { orderBy: { tributoId: 'asc' } },
         operador: { select: { id: true, nombre: true } },
       },
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk))
       pdfDoc.on('end', () => {
         const result = Buffer.concat(chunks)
-        const tipoLabel = TIPOS_COMPROBANTE[factura.tipoComprobante] || 'COMPROBANTE'
+        const tipoLabel = TIPOS_COMPROBANTE[factura.tipoComprobante || ''] || 'COMPROBANTE'
         const filename = `${tipoLabel.replace(/ /g, '_')}_${factura.numero.replace(/-/g, '_')}.pdf`
         resolve(new NextResponse(result, {
           headers: {

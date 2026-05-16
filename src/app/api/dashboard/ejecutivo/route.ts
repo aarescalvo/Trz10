@@ -32,11 +32,15 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Pendientes de cobro
-    const pendientesCobro = await db.factura.aggregate({
-      where: { saldo: { gt: 0 } },
-      _sum: { saldo: true }
+    // Pendientes de cobro (saldo = total - pagos)
+    const facturasPendientes = await db.factura.findMany({
+      where: { estado: { in: ['PENDIENTE', 'EMITIDA'] } },
+      include: { pagosFactura: true }
     })
+    const pendientesCobro = facturasPendientes.reduce(
+      (sum, f) => sum + (f.total - f.pagosFactura.reduce((s, p) => s + (p.monto || 0), 0)),
+      0
+    )
 
     // Alertas
     const alertas: any[] = []
@@ -64,13 +68,11 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Alerta: Facturas vencidas
-    const facturasVencidas = await db.factura.count({
-      where: {
-        saldo: { gt: 0 },
-        fechaVencimiento: { lt: hoy }
-      }
-    })
+    // Alerta: Facturas pendientes (no hay fechaVencimiento en el modelo)
+    const facturasVencidas = facturasPendientes.filter(f => {
+      const saldoFactura = f.total - f.pagosFactura.reduce((s, p) => s + (p.monto || 0), 0)
+      return saldoFactura > 0
+    }).length
     if (facturasVencidas > 0) {
       alertas.push({
         tipo: 'FINANCIERO',
@@ -87,7 +89,7 @@ export async function GET(request: NextRequest) {
           tropasActivas,
           faenaHoy,
           stockCritico,
-          pendientesCobro: pendientesCobro._sum.saldo || 0
+          pendientesCobro
         },
         alertas
       }

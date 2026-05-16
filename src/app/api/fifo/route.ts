@@ -293,7 +293,6 @@ export async function POST(request: NextRequest) {
       data: {
         numero: nuevoNumero,
         destino: 'Despacho FIFO automático',
-        clienteId,
         kgTotal: mediasRes.reduce((acc, m) => acc + Number(m.peso), 0),
         cantidadMedias: mediasRes.length,
         operadorId,

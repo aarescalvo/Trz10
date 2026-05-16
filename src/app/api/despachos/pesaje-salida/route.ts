@@ -24,8 +24,7 @@ export async function POST(request: NextRequest) {
     const despacho = await db.despacho.findUnique({
       where: { id: despachoId },
       include: {
-        cliente: true,
-        lineas: true
+        items: true
       }
     })
 
@@ -47,9 +46,9 @@ export async function POST(request: NextRequest) {
       data: {
         tipo: 'SALIDA_MERCADERIA',
         numeroTicket: numerador.ultimoNumero,
-        patenteChasis: despacho.patenteChasis || '',
+        patenteChasis: despacho.patenteCamion || '',
         patenteAcoplado: despacho.patenteAcoplado || '',
-        choferNombre: despacho.choferNombre || '',
+        choferNombre: despacho.chofer || '',
         choferDni: despacho.choferDni,
         pesoBruto,
         pesoTara,
@@ -63,13 +62,11 @@ export async function POST(request: NextRequest) {
     const despachoActualizado = await db.despacho.update({
       where: { id: despachoId },
       data: {
-        pesajeCamionId: pesajeCamion.id,
-        estado: 'DESPACHADO',
-        fechaDespacho: new Date()
+        ticketPesajeId: pesajeCamion.id,
+        estado: 'DESPACHADO'
       },
       include: {
-        cliente: true,
-        lineas: true as any
+        items: true
       }
     })
 
@@ -86,7 +83,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Actualizar estado de las medias res despachadas
-    for (const linea of despacho.lineas) {
+    for (const linea of despacho.items) {
       if (linea.mediaResId) {
         await db.mediaRes.update({
           where: { id: linea.mediaResId },

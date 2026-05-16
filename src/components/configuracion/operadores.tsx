@@ -422,8 +422,9 @@ export function Operadores({ operador }: { operador: Operador }) {
                         </Button>
                         <div
                           onClick={() => handleToggleActivo(op)}
-                          disabled={op.id === operador.id}
                           className={`cursor-pointer flex items-center justify-center w-8 h-8 rounded-md hover:bg-accent ${op.id === operador.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          role="switch"
+                          aria-disabled={op.id === operador.id}
                         >
                           <Switch checked={op.activo} disabled={op.id === operador.id} />
                         </div>

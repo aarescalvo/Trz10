@@ -493,7 +493,7 @@ export class SIGICAService {
           bovinosKg,
           equinosMedias,
           equinosKg,
-          remanenteKg: camara.stockCamaraSIGICA?.remanenteKg || 0
+          remanenteKg: camara.stockCamaraSIGICA?.[0]?.remanenteKg || 0
         }
       })
 

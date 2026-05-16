@@ -147,10 +147,9 @@ export async function POST(request: NextRequest) {
       {
         nombre: 'Pesaje Individual - Zebra ZT230',
         codigo: 'PESAJE_IND_ZT230',
-        tipo: TipoRotulo.PESAJE_INDIVIDUAL,
+        tipo: TipoRotulo.MEDIA_RES,
         categoria: 'PESAJE_INDIVIDUAL',
         tipoImpresora: 'ZEBRA',
-        modeloImpresora: 'ZT230',
         ancho: 100,
         alto: 50,
         dpi: 203,
@@ -165,10 +164,9 @@ export async function POST(request: NextRequest) {
       {
         nombre: 'Pesaje Individual - Zebra ZT410',
         codigo: 'PESAJE_IND_ZT410',
-        tipo: TipoRotulo.PESAJE_INDIVIDUAL,
+        tipo: TipoRotulo.MEDIA_RES,
         categoria: 'PESAJE_INDIVIDUAL',
         tipoImpresora: 'ZEBRA',
-        modeloImpresora: 'ZT410',
         ancho: 100,
         alto: 50,
         dpi: 300,
@@ -183,10 +181,9 @@ export async function POST(request: NextRequest) {
       {
         nombre: 'Pesaje Individual - Datamax Mark II',
         codigo: 'PESAJE_IND_MARK2',
-        tipo: TipoRotulo.PESAJE_INDIVIDUAL,
+        tipo: TipoRotulo.MEDIA_RES,
         categoria: 'PESAJE_INDIVIDUAL',
         tipoImpresora: 'DATAMAX',
-        modeloImpresora: 'MARK_II',
         ancho: 100,
         alto: 50,
         dpi: 203,
@@ -204,7 +201,6 @@ export async function POST(request: NextRequest) {
         tipo: TipoRotulo.MEDIA_RES,
         categoria: 'MEDIA_RES',
         tipoImpresora: 'ZEBRA',
-        modeloImpresora: 'ZT230',
         ancho: 80,
         alto: 120,
         dpi: 203,
@@ -222,7 +218,6 @@ export async function POST(request: NextRequest) {
         tipo: TipoRotulo.MEDIA_RES,
         categoria: 'MEDIA_RES',
         tipoImpresora: 'DATAMAX',
-        modeloImpresora: 'MARK_II',
         ancho: 80,
         alto: 120,
         dpi: 203,
@@ -240,7 +235,6 @@ export async function POST(request: NextRequest) {
         tipo: TipoRotulo.MENUDENCIA,
         categoria: 'MENUDENCIA',
         tipoImpresora: 'ZEBRA',
-        modeloImpresora: 'ZT230',
         ancho: 60,
         alto: 80,
         dpi: 203,
@@ -258,7 +252,6 @@ export async function POST(request: NextRequest) {
         tipo: TipoRotulo.MENUDENCIA,
         categoria: 'MENUDENCIA',
         tipoImpresora: 'DATAMAX',
-        modeloImpresora: 'MARK_II',
         ancho: 60,
         alto: 80,
         dpi: 203,
@@ -334,7 +327,7 @@ export async function GET(request: NextRequest) {
     const datamax = await db.rotulo.count({ where: { tipoImpresora: 'DATAMAX' } })
 
     const lista = await db.rotulo.findMany({
-      select: { codigo: true, nombre: true, tipo: true, categoria: true, tipoImpresora: true, modeloImpresora: true },
+      select: { codigo: true, nombre: true, tipo: true, categoria: true, tipoImpresora: true },
       orderBy: { codigo: 'asc' }
     })
 

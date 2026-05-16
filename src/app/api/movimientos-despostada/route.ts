@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
           select: { id: true, nombre: true }
         }
       },
-      orderBy: { fecha: 'desc' }
+      orderBy: { createdAt: 'desc' }
     })
 
     // Calcular estadísticas
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         HUESO: movimientos.filter(m => m.tipo === 'HUESO').length,
         GRASA: movimientos.filter(m => m.tipo === 'GRASA').length,
         MERMA: movimientos.filter(m => m.tipo === 'MERMA').length,
-        DESPERICIO: movimientos.filter(m => m.tipo === 'DESPERICIO').length
+        DESPERDICIO: movimientos.filter(m => m.tipo === 'DESPERDICIO').length
       },
       porDestino: {
         PRODUCCION: movimientos.filter(m => m.destino === 'PRODUCCION').length,
@@ -99,15 +99,14 @@ export async function POST(request: NextRequest) {
 
     const movimiento = await db.movimientoDespostada.create({
       data: {
-        loteId: loteId || null,
+        loteId: loteId!,
         tipo,
         productoId: productoId || null,
-        pesoBruto: pesoBruto || 0,
+        pesoOriginal: pesoBruto || 0,
         pesoNeto: pesoNeto || 0,
         pesoDesperdicio: pesoDesperdicio || 0,
         destino: destino || null,
         causa: causa || null,
-        tropaCodigo: tropaCodigo || null,
         observaciones: observaciones || null,
         operadorId: operadorId || null
       }

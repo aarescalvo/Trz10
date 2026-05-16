@@ -68,6 +68,7 @@ interface FechaFaena {
     id: string
     numero: number
     cantidadTotal: number
+    fecha: Date
     vbRomaneo: boolean
     tropas: Array<{ codigo: string; especie: string }>
   }>

@@ -1112,7 +1112,7 @@ export function RomaneoModule({ operador }: { operador: Operador }) {
                 Modo Producción
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={fetchData}>
+            <Button variant="outline" size="sm" onClick={() => fetchData()}>
               <RefreshCw className="w-4 h-4 mr-1" />
               Actualizar
             </Button>

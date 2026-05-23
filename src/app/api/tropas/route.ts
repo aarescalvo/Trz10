@@ -3,14 +3,14 @@ import { db } from '@/lib/db'
 import { EstadoTropa, Especie } from '@prisma/client'
 
 // Estados válidos para referencia
-import { checkPermission } from '@/lib/auth-helpers'
+import { checkPermission, checkAnyPermission } from '@/lib/auth-helpers'
 const ESTADOS_VALIDOS = Object.values(EstadoTropa)
 
 // API de Tropas - V2: Stock corral, capacidad, DTE/Guía, transacciones
 
 // GET - Fetch all tropas
 export async function GET(request: NextRequest) {
-  const authError = await checkPermission(request, 'puedeMovimientoHacienda')
+  const authError = await checkAnyPermission(request, ['puedeMovimientoHacienda', 'puedeCalidad', 'puedePesajeIndividual', 'puedePesajeCamiones', 'puedeIngresoCajon'])
   if (authError) return authError
 
   try {

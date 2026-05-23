@@ -163,6 +163,39 @@ export async function checkPermission(
 }
 
 /**
+ * Valida que un operador tenga AL MENOS UNO de los permisos indicados.
+ * Útil para endpoints que son accedidos desde múltiples módulos.
+ * 
+ * @example
+ *   const authError = await checkAnyPermission(request, ['puedeMovimientoHacienda', 'puedeCalidad'])
+ *   if (authError) return authError
+ */
+export async function checkAnyPermission(
+  request: NextRequest,
+  permisos: string[]
+): Promise<NextResponse | null> {
+  const operadorId = request.headers.get('x-operador-id')
+
+  if (!operadorId) {
+    return NextResponse.json(
+      { success: false, error: 'No autenticado' },
+      { status: 401 }
+    )
+  }
+
+  for (const permiso of permisos) {
+    const hasPermission = await validarPermiso(operadorId, permiso)
+    if (hasPermission) return null
+  }
+
+  logger.warn('Permiso denegado (ninguno de los requeridos)', { operadorId, permisos })
+  return NextResponse.json(
+    { success: false, error: 'Sin permisos suficientes' },
+    { status: 403 }
+  )
+}
+
+/**
  * Valida que un operador tenga rol ADMINISTRADOR.
  * Solo los administradores pueden realizar operaciones críticas como:
  * - Crear/eliminar operadores
